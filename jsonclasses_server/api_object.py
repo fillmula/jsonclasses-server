@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import ClassVar
+from typing import ClassVar, TYPE_CHECKING
 from jsonclasses_orm.orm_object import ORMObject
-from .aconf import AConf
+if TYPE_CHECKING:
+    from .aconf import AConf
 
 
 class APIObject(ORMObject):

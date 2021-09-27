@@ -4,6 +4,7 @@ from .actx import ACtx
 
 
 class APIRecord(NamedTuple):
+    uid: str
     kind: Literal['C', 'R', 'U', 'D', 'L']
     method: str
     url: str

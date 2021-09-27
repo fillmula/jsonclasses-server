@@ -1,11 +1,11 @@
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 from jsonclasses.jobject import JObject
 
 
-class ACtx:
-    id: Optional[Any]
-    prid: Optional[Any]
-    operator: Optional[type[JObject]]
-    qs: Optional[str]
-    body: Optional[dict[str, Any]]
+class ACtx(NamedTuple):
+    id: Optional[Any] = None
+    prid: Optional[Any] = None
+    operator: Optional[type[JObject]] = None
+    qs: Optional[str] = None
+    body: Optional[dict[str, Any]] = None
