@@ -4,8 +4,8 @@ from jsonclasses.jobject import JObject
 
 
 class ACtx:
-    id: Optional[str]
-    prid: Optional[str]
+    id: Optional[Any]
+    prid: Optional[Any]
     operator: Optional[type[JObject]]
     qs: Optional[str]
     body: Optional[dict[str, Any]]
