@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import ClassVar
+from typing import ClassVar, Tuple, Any
 from .api_object import APIObject
 from .aconf import AConf
 from .api_record import APIRecord
@@ -48,28 +48,30 @@ class API:
         gname = f'/{name}'
         sname = f'{gname}/:id'
         if 'L' in aconf.actions:
-            def l(actx: ACtx) -> None:
-
-                return None
+            def l(actx: ACtx) -> Tuple[int, Any]:
+                result = cls.find(actx.qs).exec()
+                return (200, result)
             self._records.append(APIRecord('GET', gname, l))
         if 'R' in aconf.actions:
-            def r() -> None:
-                return None
+            def r(actx: ACtx) -> Tuple[int, Any]:
+                result = cls.id(actx.id).exec()
+                return (200, result)
             self._records.append(APIRecord('GET', sname, r))
         if 'C' in aconf.actions:
-            def c() -> None:
-                return None
+            def c(actx: ACtx) -> Tuple[int, Any]:
+                result = cls(**(actx.body or {})).save()
+                return (200, result)
             self._records.append(APIRecord('POST', gname, c))
         if 'U' in aconf.actions:
-            def u() -> None:
-                return None
+            def u(actx: ACtx) -> Tuple[int, Any]:
+                result = cls.id(actx.id).exec().set(**(actx.body or {})).save()
+                return (200, result)
             self._records.append(APIRecord('PATCH', sname, u))
         if 'D' in aconf.actions:
-            def d() -> None:
-                return None
+            def d(actx: ACtx) -> Tuple[int, Any]:
+                cls.id(actx.id).exec().delete()
+                return (204, None)
             self._records.append(APIRecord('DELETE', sname, d))
-
-
 
 
 API.default = API('default')

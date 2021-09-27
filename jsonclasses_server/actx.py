@@ -8,5 +8,4 @@ class ACtx:
     prid: Optional[str]
     operator: Optional[type[JObject]]
     qs: Optional[str]
-    params: Optional[dict[str, Any]]
     body: Optional[dict[str, Any]]
