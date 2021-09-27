@@ -1,8 +1,8 @@
-import pathlib
+from pathlib import Path
 from setuptools import setup, find_packages
 
 # The directory containing this file
-HERE = pathlib.Path(__file__).parent
+HERE = Path(__file__).parent
 
 # The text of the README file
 README = (HERE / "README.md").read_text()
@@ -20,4 +20,5 @@ setup(name='jsonclasses-server',
       zip_safe=False,
       url='https://github.com/fillmula/jsonclasses-server',
       include_package_data=True,
-      python_requires='>=3.9')
+      python_requires='>=3.9',
+      install_requires=['qsparser>=1.0.1,<2.0.0'])

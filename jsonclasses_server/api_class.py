@@ -3,6 +3,7 @@ from typing import ClassVar
 from .api_object import APIObject
 from .aconf import AConf
 from .api_record import APIRecord
+from .actx import ACtx
 from .nameutils import (
     cname_to_pname, fname_to_pname, pname_to_cname, pname_to_fname
 )
@@ -47,7 +48,8 @@ class API:
         gname = f'/{name}'
         sname = f'{gname}/:id'
         if 'L' in aconf.actions:
-            def l() -> None:
+            def l(actx: ACtx) -> None:
+
                 return None
             self._records.append(APIRecord('GET', gname, l))
         if 'R' in aconf.actions:
