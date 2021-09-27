@@ -22,6 +22,7 @@ class API:
             return
         self._graph_name: str = graph_name
         self._default_aconf = AConf(
+            cls=None,
             name=None,
             enable='CRUDL',
             disable=None,

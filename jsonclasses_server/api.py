@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Union, Callable, Optional, overload
+from typing import Union, Callable, Optional, overload, cast
 from jsonclasses.jobject import JObject
 from jsonclasses.isjsonclass import isjsonclass
 from .aconf import AConf
+from .api_object import APIObject
 
 
 @overload
@@ -19,7 +20,7 @@ def api(
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
     pathname_to_field_name: Optional[Callable[[str], str]] = None
-) -> Callable[[type[JObject]], type[JObject]]: ...
+) -> Callable[[type[APIObject]], type[APIObject]]: ...
 
 
 @overload
@@ -32,11 +33,11 @@ def api(
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
     pathname_to_field_name: Optional[Callable[[str], str]] = None
-) -> type[JObject]: ...
+) -> type[APIObject]: ...
 
 
 def api(
-    cls: type[JObject],
+    cls: Union[type[JObject], None],
     name: Optional[str] = None,
     enable: Optional[str] = None,
     disable: Optional[str] = None,
@@ -44,11 +45,12 @@ def api(
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
     pathname_to_field_name: Optional[Callable[[str], str]] = None
-) -> Union[Callable[[type[JObject]], type[JObject]], type[JObject]]:
+) -> Union[Callable[[type[APIObject]], type[APIObject]], type[APIObject]]:
     from .api_class import API
     if cls is not None:
         if not isjsonclass(cls):
             raise ValueError('@api should be used to decorate a JSONClass class.')
+        cls = cast(type[APIObject], cls)
         aconf = AConf(
             cls=cls,
             name=name,
@@ -59,7 +61,7 @@ def api(
             pname_to_cname=pathname_to_class_name,
             pname_to_fname=pathname_to_field_name)
         cls.aconf = aconf
-        API(cls.cdef.jconf.cgraph.name).record(cls)
+        API(cls.cdef.jconf.cgraph.name).record(cls, aconf)
         return cls
     else:
         def parametered_api(cls):

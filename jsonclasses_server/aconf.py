@@ -2,8 +2,8 @@
 JSONClasses object's API configurations.
 """
 from __future__ import annotations
-from typing import Optional, Callable, Any, Union, cast, final, TYPE_CHECKING
-from jsonclasses.jobject import JObject
+from typing import Optional, Callable, Union, cast, final
+from .api_object import APIObject
 
 
 @final
@@ -13,7 +13,7 @@ class AConf:
     """
 
     def __init__(self: AConf,
-                 cls: type[JObject],
+                 cls: Union[type[APIObject], None],
                  name: Optional[str],
                  enable: Optional[str],
                  disable: Optional[str],
@@ -35,10 +35,10 @@ class AConf:
         self._pname_to_fname = pname_to_fname
 
     @property
-    def cls(self: AConf) -> type[JObject]:
+    def cls(self: AConf) -> type[APIObject]:
         """The JSON class on which this class config is defined.
         """
-        return cast(type[JObject], self._cls)
+        return cast(type[APIObject], self._cls)
 
     @property
     def default_aconf(self: AConf) -> AConf:
