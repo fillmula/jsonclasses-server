@@ -8,7 +8,7 @@ HERE = Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
 setup(name='jsonclasses-server',
-      version='2.8.0',
+      version='2.8.1',
       description='jsonclasses server',
       long_description=README,
       long_description_content_type="text/markdown",
@@ -22,6 +22,7 @@ setup(name='jsonclasses-server',
       include_package_data=True,
       python_requires='>=3.9',
       install_requires=[
+            'jsonclasses-orm==2.8.1',
             'qsparser>=1.0.1,<2.0.0',
             'pyjwt>=2.1.0,<3.0.0'
       ])
