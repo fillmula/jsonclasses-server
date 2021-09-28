@@ -69,7 +69,6 @@ def _install_l(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     lcallback = record.callback
     def list_all():
-        print("LISTALL", record.uid)
         ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None)
         [_, result] = lcallback(ctx)
         return jsonify(data=result)
