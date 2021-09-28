@@ -21,4 +21,7 @@ setup(name='jsonclasses-server',
       url='https://github.com/fillmula/jsonclasses-server',
       include_package_data=True,
       python_requires='>=3.9',
-      install_requires=['qsparser>=1.0.1,<2.0.0'])
+      install_requires=[
+            'qsparser>=1.0.1,<2.0.0',
+            'pyjwt>=2.1.0,<3.0.0'
+      ])
