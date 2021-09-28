@@ -1,11 +1,9 @@
 from __future__ import annotations
-
-import flask
-from jsonclasses_server.api_record import APIRecord
 from typing import Any, TYPE_CHECKING
 from re import sub
 from .api_class import API
 from .actx import ACtx
+from .api_record import APIRecord
 if TYPE_CHECKING:
     from flask import Flask, Blueprint
 
@@ -35,35 +33,16 @@ def create_flask_server(graph: str = 'default') -> Flask:
         if record.kind == 'L':
             _install_l(record, bp, flask_url)
         elif record.kind == 'R':
-            rcallback = record.callback
-            def read_by_id(id: Any):
-                ctx = ACtx(id=id)
-                [_, result] = rcallback(ctx)
-                return jsonify(date=result)
-            bp.get(flask_url)(read_by_id)
+            _install_r(record, bp, flask_url)
         elif record.kind == 'C':
-            ccallback = record.callback
-            def create():
-                ctx = ACtx(body=(request.form | request.files or request.json))
-                [_, result] = ccallback(ctx)
-                return jsonify(date=result)
-            bp.post(flask_url)(create)
+            _install_c(record, bp, flask_url)
         elif record.kind == 'U':
-            ucallback = record.callback
-            def update(id: Any):
-                ctx = ACtx(id=id, body=((request.form | request.files) or request.json))
-                [_, result] = ucallback(ctx)
-                return jsonify(date=result)
-            bp.patch(flask_url)(update)
+            _install_u(record, bp, flask_url)
         elif record.kind == 'D':
-            dcallback = record.callback
-            def delete(id: Any):
-                ctx = ACtx(id=id)
-                dcallback(ctx)
-                return make_response('', 204)
-            bp.delete(flask_url)(delete)
+            _install_d(record, bp, flask_url)
         app.register_blueprint(bp)
     return app
+
 
 def _install_l(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
@@ -73,3 +52,43 @@ def _install_l(record: APIRecord, bp: Blueprint, url: str) -> None:
         [_, result] = lcallback(ctx)
         return jsonify(data=result)
     bp.get(url)(list_all)
+
+
+def _install_r(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    rcallback = record.callback
+    def read_by_id(id: Any):
+        ctx = ACtx(id=id)
+        [_, result] = rcallback(ctx)
+        return jsonify(date=result)
+    bp.get(url)(read_by_id)
+
+
+def _install_c(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    ccallback = record.callback
+    def create():
+        ctx = ACtx(body=(request.form | request.files or request.json))
+        [_, result] = ccallback(ctx)
+        return jsonify(date=result)
+    bp.post(url)(create)
+
+
+def _install_u(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    ucallback = record.callback
+    def update(id: Any):
+        ctx = ACtx(id=id, body=((request.form | request.files) or request.json))
+        [_, result] = ucallback(ctx)
+        return jsonify(date=result)
+    bp.patch(url)(update)
+
+
+def _install_d(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    dcallback = record.callback
+    def delete(id: Any):
+        ctx = ACtx(id=id)
+        dcallback(ctx)
+        return make_response('', 204)
+    bp.delete(url)(delete)
