@@ -48,30 +48,39 @@ class API:
         gname = f'/{name}'
         sname = f'{gname}/:id'
         if 'L' in aconf.actions:
-            def l(actx: ACtx) -> Tuple[int, Any]:
-                result = cls.find(actx.qs).exec()
-                return (200, result)
-            self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
+            self.record_l(cls, aconf, name, gname, sname)
         if 'R' in aconf.actions:
             def r(actx: ACtx) -> Tuple[int, Any]:
+                print("R RUN")
                 result = cls.id(actx.id).exec()
                 return (200, result)
             self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
         if 'C' in aconf.actions:
             def c(actx: ACtx) -> Tuple[int, Any]:
+                print("C RUN")
                 result = cls(**(actx.body or {})).save()
                 return (200, result)
             self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
         if 'U' in aconf.actions:
             def u(actx: ACtx) -> Tuple[int, Any]:
+                print("U RUN")
                 result = cls.id(actx.id).exec().set(**(actx.body or {})).save()
                 return (200, result)
             self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
         if 'D' in aconf.actions:
             def d(actx: ACtx) -> Tuple[int, Any]:
+                print("D RUN")
                 cls.id(actx.id).exec().delete()
                 return (204, None)
             self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
+
+    def record_l(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+            def l(actx: ACtx) -> Tuple[int, Any]:
+                print("L RUN")
+                print(cls.__name__)
+                result = cls.find(actx.qs).exec()
+                return (200, result)
+            self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
 
     @property
     def records(self) -> list[APIRecord]:

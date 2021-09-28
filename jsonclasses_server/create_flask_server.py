@@ -1,9 +1,13 @@
 from __future__ import annotations
+
+import flask
+from jsonclasses_server.api_record import APIRecord
 from typing import Any, TYPE_CHECKING
+from re import sub
 from .api_class import API
 from .actx import ACtx
 if TYPE_CHECKING:
-    from flask import Flask
+    from flask import Flask, Blueprint
 
 
 def try_import_flask():
@@ -26,36 +30,47 @@ def create_flask_server(graph: str = 'default') -> Flask:
             return super().default(o)
     app.json_encoder = JSJSONEncoder
     for record in API(graph).records:
+        flask_url = sub(r':([^/]+)', '<\\1>', record.url)
         bp = Blueprint(record.uid, record.uid)
         if record.kind == 'L':
-            def list_all():
-                ctx = ACtx(qs=str(request.query_string))
-                [_, result] = record.callback(ctx)
-                return jsonify(data=result)
-            bp.route(record.url, methods=[record.method])(list_all)
+            _install_l(record, bp, flask_url)
         elif record.kind == 'R':
+            rcallback = record.callback
             def read_by_id(id: Any):
                 ctx = ACtx(id=id)
-                [_, result] = record.callback(ctx)
+                [_, result] = rcallback(ctx)
                 return jsonify(date=result)
-            bp.route(record.url, methods=[record.method])(read_by_id)
+            bp.get(flask_url)(read_by_id)
         elif record.kind == 'C':
+            ccallback = record.callback
             def create():
                 ctx = ACtx(body=(request.form | request.files or request.json))
-                [_, result] = record.callback(ctx)
+                [_, result] = ccallback(ctx)
                 return jsonify(date=result)
-            bp.route(record.url, methods=[record.method])(create)
+            bp.post(flask_url)(create)
         elif record.kind == 'U':
+            ucallback = record.callback
             def update(id: Any):
                 ctx = ACtx(id=id, body=((request.form | request.files) or request.json))
-                [_, result] = record.callback(ctx)
+                [_, result] = ucallback(ctx)
                 return jsonify(date=result)
-            bp.route(record.url, methods=[record.method])(update)
+            bp.patch(flask_url)(update)
         elif record.kind == 'D':
+            dcallback = record.callback
             def delete(id: Any):
                 ctx = ACtx(id=id)
-                record.callback(ctx)
+                dcallback(ctx)
                 return make_response('', 204)
-            bp.route(record.url, methods=[record.method])(delete)
+            bp.delete(flask_url)(delete)
         app.register_blueprint(bp)
     return app
+
+def _install_l(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    lcallback = record.callback
+    def list_all():
+        print("LISTALL", record.uid)
+        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None)
+        [_, result] = lcallback(ctx)
+        return jsonify(data=result)
+    bp.get(url)(list_all)
