@@ -1,11 +1,15 @@
 from __future__ import annotations
-from typing import ClassVar, Tuple, Any
+from jsonclasses_server.auth_conf import AuthConf
+from typing import ClassVar, Tuple, Any, cast
+from jsonclasses.ctx import Ctx
 from .api_object import APIObject
 from .aconf import AConf
 from .api_record import APIRecord
 from .actx import ACtx
+from .encode_jwt_token import encode_jwt_token
 from .nameutils import (
-    cname_to_pname, fname_to_pname, pname_to_cname, pname_to_fname
+    cname_to_pname, cname_to_srname, fname_to_pname, pname_to_cname,
+    pname_to_fname
 )
 
 
@@ -31,7 +35,8 @@ class API:
             cname_to_pname=cname_to_pname,
             fname_to_pname=fname_to_pname,
             pname_to_cname=pname_to_cname,
-            pname_to_fname=pname_to_fname)
+            pname_to_fname=pname_to_fname,
+            cname_to_srname=cname_to_srname)
         self._records: list[APIRecord] = []
         self.__class__._initialized_map[graph_name] = True
         return None
@@ -42,6 +47,49 @@ class API:
     def aconf(self: API) -> AConf:
         """The default API configuration for all classes on this graph."""
         return self._default_aconf
+
+    def record_auth(self: API, cls: type[APIObject], auth_conf: AuthConf) -> None:
+        aconf = cls.aconf
+        basename = aconf.name or aconf.cname_to_pname(cls.__name__)
+        name = f'/{basename}/session'
+        ai_fields = cls.cdef._auth_identity_fields
+        ai_names = [f.name for f in ai_fields]
+        ai_json_names = [f.json_name for f in ai_fields]
+        ai_valid_names = set(ai_names + ai_json_names)
+        ab_fields = cls.cdef._auth_by_fields
+        ab_names = [f.name for f in ab_fields]
+        ab_json_names = [f.json_name for f in ai_fields]
+        ab_valid_names = set(ab_names + ab_json_names)
+        def auth(actx: ACtx) -> Tuple[int, Any]:
+            body = cast(dict[str, Any], actx.body)
+            ai_set = set(body.keys()).intersection(ai_valid_names)
+            len_ai_set = len(ai_set)
+            if len_ai_set < 1:
+                raise Exception('no identity provided')
+            if len_ai_set > 1:
+                raise Exception('multiple identity provided')
+            ab_set = set(body.keys()).intersection(ab_valid_names)
+            len_ab_set = len(ab_set)
+            if len_ab_set < 1:
+                raise Exception('no authentication provided')
+            if len_ab_set > 1:
+                raise Exception('multiple identity provided')
+            u_ai_name = ai_set.pop()
+            u_ab_name = ab_set.pop()
+            ai_value = body[u_ai_name]
+            ab_value = body[u_ab_name]
+            ai_name = cls.cdef.jconf.key_decoding_strategy(u_ai_name)
+            ab_name = cls.cdef.jconf.key_decoding_strategy(u_ab_name)
+            obj = cls.one(**{ai_name: ai_value}).optional.exec()
+            if obj is None:
+                raise Exception('authorizable unit not found')
+            checker = cls.cdef.field_named(ab_name).fdef.auth_by_checker
+            ctx = Ctx.rootctxp(obj, ab_value)
+            checker.modifier.validate(ctx)
+            token = encode_jwt_token(obj, "abc", auth_conf.expires_in)
+            srname = aconf.cname_to_srname(cls.__name__)
+            return (200, {'token': token, srname: obj})
+        self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
 
     def record(self: API, cls: type[APIObject], aconf: AConf) -> None:
         name = aconf.name or aconf.cname_to_pname(cls.__name__)

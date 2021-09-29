@@ -20,7 +20,8 @@ class AConf:
                  cname_to_pname: Optional[Callable[[str], str]],
                  fname_to_pname: Optional[Callable[[str], str]],
                  pname_to_cname: Optional[Callable[[str], str]],
-                 pname_to_fname: Optional[Callable[[str], str]]) -> None:
+                 pname_to_fname: Optional[Callable[[str], str]],
+                 cname_to_srname: Optional[Callable[[str], str]]) -> None:
         """
         Initialize a new API configuration object.
         """
@@ -33,6 +34,7 @@ class AConf:
         self._fname_to_pname = fname_to_pname
         self._pname_to_cname = pname_to_cname
         self._pname_to_fname = pname_to_fname
+        self._cname_to_srname = cname_to_srname
 
     @property
     def cls(self: AConf) -> type[APIObject]:
@@ -89,3 +91,9 @@ class AConf:
         if self._pname_to_fname is not None:
             return self._pname_to_fname
         return self.default_aconf.pname_to_fname
+
+    @property
+    def cname_to_srname(self: AConf) -> Callable[[str], str]:
+        if self._cname_to_srname is not None:
+            return self._cname_to_srname
+        return self.default_aconf.cname_to_srname

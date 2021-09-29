@@ -34,3 +34,10 @@ def pname_to_fname(pname: str) -> str:
         raise_kindly()
     return underscore(pname)
 
+
+def cname_to_srname(cname: str) -> str:
+    try:
+        from inflection import singularize, camelize
+    except ModuleNotFoundError as e:
+        raise_kindly()
+    return singularize(camelize(cname, False))

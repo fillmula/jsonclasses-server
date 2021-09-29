@@ -7,7 +7,7 @@ from .api_object import APIObject
 
 
 @overload
-def api(cls: type[JObject]) -> type: ...
+def api(cls: type[JObject]) -> type[APIObject]: ...
 
 
 @overload
@@ -19,7 +19,8 @@ def api(
     class_name_to_pathname: Optional[Callable[[str], str]] = None,
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
-    pathname_to_field_name: Optional[Callable[[str], str]] = None
+    pathname_to_field_name: Optional[Callable[[str], str]] = None,
+    class_name_to_singular_resource_name: Optional[Callable[[str], str]] = None
 ) -> Callable[[type[APIObject]], type[APIObject]]: ...
 
 
@@ -32,7 +33,8 @@ def api(
     class_name_to_pathname: Optional[Callable[[str], str]] = None,
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
-    pathname_to_field_name: Optional[Callable[[str], str]] = None
+    pathname_to_field_name: Optional[Callable[[str], str]] = None,
+    class_name_to_singular_resource_name: Optional[Callable[[str], str]] = None
 ) -> type[APIObject]: ...
 
 
@@ -44,7 +46,8 @@ def api(
     class_name_to_pathname: Optional[Callable[[str], str]] = None,
     field_name_to_pathname: Optional[Callable[[str], str]] = None,
     pathname_to_class_name: Optional[Callable[[str], str]] = None,
-    pathname_to_field_name: Optional[Callable[[str], str]] = None
+    pathname_to_field_name: Optional[Callable[[str], str]] = None,
+    class_name_to_singular_resource_name: Optional[Callable[[str], str]] = None
 ) -> Union[Callable[[type[APIObject]], type[APIObject]], type[APIObject]]:
     from .api_class import API
     if cls is not None:
@@ -59,7 +62,8 @@ def api(
             cname_to_pname=class_name_to_pathname,
             fname_to_pname=field_name_to_pathname,
             pname_to_cname=pathname_to_class_name,
-            pname_to_fname=pathname_to_field_name)
+            pname_to_fname=pathname_to_field_name,
+            cname_to_srname=class_name_to_singular_resource_name)
         cls.aconf = aconf
         API(cls.cdef.jconf.cgraph.name).record(cls, aconf)
         return cls
@@ -70,8 +74,10 @@ def api(
                 name=name,
                 enable=enable,
                 disable=disable,
-                cname_to_pname=class_name_to_pathname,
-                fname_to_pname=field_name_to_pathname,
-                pname_to_cname=pathname_to_class_name,
-                pname_to_fname=pathname_to_field_name)
+                class_name_to_pathname=class_name_to_pathname,
+                field_name_to_pathname=field_name_to_pathname,
+                pathname_to_class_name=pathname_to_class_name,
+                pathname_to_field_name=pathname_to_field_name,
+                class_name_to_singular_resource_name=class_name_to_singular_resource_name
+            )
         return parametered_api

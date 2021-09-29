@@ -5,7 +5,7 @@ from .actx import ACtx
 
 class APIRecord(NamedTuple):
     uid: str
-    kind: Literal['C', 'R', 'U', 'D', 'L']
+    kind: Literal['C', 'R', 'U', 'D', 'L', 'S']
     method: str
     url: str
     callback: Callable[[ACtx], Tuple[int, Any]]
