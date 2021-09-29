@@ -8,7 +8,7 @@ HERE = Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
 setup(name='jsonclasses-server',
-      version='2.8.1',
+      version='2.8.2',
       description='jsonclasses server',
       long_description=README,
       long_description_content_type="text/markdown",

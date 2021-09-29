@@ -192,6 +192,8 @@ def create_flask_server(graph: str = 'default',
             _install_u(record, bp, flask_url)
         elif record.kind == 'D':
             _install_d(record, bp, flask_url)
+        elif record.kind == 'S':
+            _install_s(record, bp, flask_url)
         app.register_blueprint(bp)
     return app
 
@@ -244,3 +246,13 @@ def _install_d(record: APIRecord, bp: Blueprint, url: str) -> None:
         dcallback(ctx)
         return make_response('', 204)
     bp.delete(url)(delete)
+
+
+def _install_s(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    scallback = record.callback
+    def create_session():
+        ctx = ACtx(body=(request.form | request.files or request.json))
+        [_, result] = scallback(ctx)
+        return jsonify(date=result)
+    bp.post(url)(create_session)

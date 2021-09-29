@@ -58,7 +58,7 @@ class API:
         ai_valid_names = set(ai_names + ai_json_names)
         ab_fields = cls.cdef._auth_by_fields
         ab_names = [f.name for f in ab_fields]
-        ab_json_names = [f.json_name for f in ai_fields]
+        ab_json_names = [f.json_name for f in ab_fields]
         ab_valid_names = set(ab_names + ab_json_names)
         def auth(actx: ACtx) -> Tuple[int, Any]:
             body = cast(dict[str, Any], actx.body)
@@ -84,7 +84,7 @@ class API:
             if obj is None:
                 raise Exception('authorizable unit not found')
             checker = cls.cdef.field_named(ab_name).fdef.auth_by_checker
-            ctx = Ctx.rootctxp(obj, ab_value)
+            ctx = Ctx.rootctxp(obj, ab_name, getattr(obj, ab_name), ab_value)
             checker.modifier.validate(ctx)
             token = encode_jwt_token(obj, "abc", auth_conf.expires_in)
             srname = aconf.cname_to_srname(cls.__name__)
