@@ -105,7 +105,7 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
     code = 401 if isinstance(exception, UnauthorizedActionException) else code
     if current_app.debug:
         if code == 500:
-            print_exception(etype=type[exception], value=exception, tb=exception.__traceback__)
+            print_exception(type[exception], value=exception, tb=exception.__traceback__)
             return jsonify({
                 'error': _remove_none({
                     'type': 'Internal Server Error',
@@ -131,7 +131,7 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
             }), code
     else:
         if code == 500:
-            print_exception(etype=type[exception], value=exception, tb=exception.__traceback__)
+            print_exception(type[exception], value=exception, tb=exception.__traceback__)
             return jsonify({
                 'error': _remove_none({
                     'type': 'Internal Server Error',
