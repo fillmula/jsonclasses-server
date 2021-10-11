@@ -184,6 +184,8 @@ def create_flask_server(graph: str = 'default',
         bp = Blueprint(record.uid, record.uid)
         if record.kind == 'L':
             _install_l(record, bp, flask_url)
+        elif record.kind == 'E':
+            _install_e(record, bp, flask_url)
         elif record.kind == 'R':
             _install_r(record, bp, flask_url)
         elif record.kind == 'C':
@@ -214,7 +216,7 @@ def _install_r(record: APIRecord, bp: Blueprint, url: str) -> None:
     def read_by_id(id: Any):
         ctx = ACtx(id=id)
         [_, result] = rcallback(ctx)
-        return jsonify(date=result)
+        return jsonify(data=result)
     bp.get(url)(read_by_id)
 
 
@@ -224,7 +226,7 @@ def _install_c(record: APIRecord, bp: Blueprint, url: str) -> None:
     def create():
         ctx = ACtx(body=(request.form | request.files or request.json))
         [_, result] = ccallback(ctx)
-        return jsonify(date=result)
+        return jsonify(data=result)
     bp.post(url)(create)
 
 
@@ -234,7 +236,7 @@ def _install_u(record: APIRecord, bp: Blueprint, url: str) -> None:
     def update(id: Any):
         ctx = ACtx(id=id, body=((request.form | request.files) or request.json))
         [_, result] = ucallback(ctx)
-        return jsonify(date=result)
+        return jsonify(data=result)
     bp.patch(url)(update)
 
 
@@ -254,5 +256,15 @@ def _install_s(record: APIRecord, bp: Blueprint, url: str) -> None:
     def create_session():
         ctx = ACtx(body=(request.form | request.files or request.json))
         [_, result] = scallback(ctx)
-        return jsonify(date=result)
+        return jsonify(data=result)
     bp.post(url)(create_session)
+
+
+def _install_e(record: APIRecord, bp: Blueprint, url: str) -> None:
+    from flask import request, g, jsonify, make_response, Flask, Blueprint
+    ecallback = record.callback
+    def create():
+        ctx = ACtx(body=(request.form | request.files or request.json))
+        [_, result] = ecallback(ctx)
+        return jsonify(data=result)
+    bp.post(url)(create)
