@@ -22,7 +22,7 @@ setup(name='jsonclasses-server',
       include_package_data=True,
       python_requires='>=3.9',
       install_requires=[
-            'jsonclasses-orm==2.8.1',
+            'jsonclasses-orm==2.8.2',
             'qsparser>=1.0.1,<2.0.0',
             'pyjwt>=2.1.0,<3.0.0'
       ])
