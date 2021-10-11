@@ -99,7 +99,7 @@ class API:
         if 'L' in aconf.actions:
             self.record_l(cls, aconf, name, gname, sname)
         if 'E' in aconf.actions:
-            self.record_e(cls, aconf, name, ename)
+            self.record_e(cls, name, ename)
         if 'R' in aconf.actions:
             self.record_r(cls, aconf, name, gname, sname)
         if 'C' in aconf.actions:
@@ -139,9 +139,26 @@ class API:
             return (204, None)
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
 
-    def record_e(self: API, cls: type[APIObject], aconf: AConf, name: str, ename: str) -> None:
+    def record_e(self: API, cls: type[APIObject], name: str, ename: str) -> None:
         def e(actx: ACtx) -> tuple[int, Any]:
-            return (200, None)
+            ufields = cls.cdef._unique_fields
+            unames = [f.name for f in ufields]
+            ujsonnames = [f.json_name for f in ufields]
+            uvalidnames = set(unames + ujsonnames)
+            matcher: dict[str, Any] = {}
+            updater: dict[str, Any] = {}
+            for k, v in actx.body.items():
+                if k in uvalidnames:
+                    if actx.body[k] is not None:
+                        matcher[k] = v
+                else:
+                    updater[k] = v
+            result = cls.one(matcher).optional.exec()
+            if result:
+                result.set(**updater).save()
+            else:
+                result = cls(**actx.body).save()
+            return (200, result)
         self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
 
     @property
