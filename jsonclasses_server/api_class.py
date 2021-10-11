@@ -95,8 +95,11 @@ class API:
         name = aconf.name or aconf.cname_to_pname(cls.__name__)
         gname = f'/{name}'
         sname = f'{gname}/:id'
+        ename = f'{gname}/ensure'
         if 'L' in aconf.actions:
             self.record_l(cls, aconf, name, gname, sname)
+        if 'E' in aconf.actions:
+            self.record_e(cls, aconf, name, ename)
         if 'R' in aconf.actions:
             self.record_r(cls, aconf, name, gname, sname)
         if 'C' in aconf.actions:
@@ -135,6 +138,11 @@ class API:
             cls.id(actx.id).exec().delete()
             return (204, None)
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
+
+    def record_e(self: API, cls: type[APIObject], aconf: AConf, name: str, ename: str) -> None:
+        def e(actx: ACtx) -> tuple[int, Any]:
+            return (200, None)
+        self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
 
     @property
     def records(self) -> list[APIRecord]:
