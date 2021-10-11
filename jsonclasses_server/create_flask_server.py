@@ -263,8 +263,8 @@ def _install_s(record: APIRecord, bp: Blueprint, url: str) -> None:
 def _install_e(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ecallback = record.callback
-    def create():
+    def ensure():
         ctx = ACtx(body=(request.form | request.files or request.json))
         [_, result] = ecallback(ctx)
         return jsonify(data=result)
-    bp.post(url)(create)
+    bp.post(url)(ensure)

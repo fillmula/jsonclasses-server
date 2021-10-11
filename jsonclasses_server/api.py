@@ -39,7 +39,7 @@ def api(
 
 
 def api(
-    cls: Union[type[JObject], None],
+    cls: Union[type[JObject], None] = None,
     name: Optional[str] = None,
     enable: Optional[str] = None,
     disable: Optional[str] = None,
