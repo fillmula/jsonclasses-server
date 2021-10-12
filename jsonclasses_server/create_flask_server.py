@@ -8,6 +8,7 @@ from jsonclasses.excs import ObjectNotFoundException
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
+from .excs import AuthenticationException
 if TYPE_CHECKING:
     from flask import Flask, Blueprint, Response
 
@@ -103,6 +104,7 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
     code = 400 if isinstance(exception, ValidationException) else code
     code = 400 if isinstance(exception, UniqueConstraintException) else code
     code = 401 if isinstance(exception, UnauthorizedActionException) else code
+    code = 400 if isinstance(exception, AuthenticationException) else code
     if current_app.debug:
         if code == 500:
             print_exception(type[exception], value=exception, tb=exception.__traceback__)

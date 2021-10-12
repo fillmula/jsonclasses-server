@@ -11,6 +11,7 @@ from .nameutils import (
     cname_to_pname, cname_to_srname, fname_to_pname, pname_to_cname,
     pname_to_fname
 )
+from .excs import AuthenticationException
 
 
 class API:
@@ -65,15 +66,15 @@ class API:
             ai_set = set(body.keys()).intersection(ai_valid_names)
             len_ai_set = len(ai_set)
             if len_ai_set < 1:
-                raise Exception('no identity provided')
+                raise AuthenticationException('no identity provided')
             if len_ai_set > 1:
-                raise Exception('multiple identity provided')
+                raise AuthenticationException('multiple identities provided')
             ab_set = set(body.keys()).intersection(ab_valid_names)
             len_ab_set = len(ab_set)
             if len_ab_set < 1:
-                raise Exception('no authentication provided')
+                raise AuthenticationException('no authentication provided')
             if len_ab_set > 1:
-                raise Exception('multiple identity provided')
+                raise AuthenticationException('multiple authentications provided')
             u_ai_name = ai_set.pop()
             u_ab_name = ab_set.pop()
             ai_value = body[u_ai_name]
@@ -82,7 +83,7 @@ class API:
             ab_name = cls.cdef.jconf.key_decoding_strategy(u_ab_name)
             obj = cls.one(**{ai_name: ai_value}).optional.exec()
             if obj is None:
-                raise Exception('authorizable unit not found')
+                raise AuthenticationException('authorizable unit not found')
             checker = cls.cdef.field_named(ab_name).fdef.auth_by_checker
             ctx = Ctx.rootctxp(obj, ab_name, getattr(obj, ab_name), ab_value)
             newval = checker.modifier.transform(ctx)
