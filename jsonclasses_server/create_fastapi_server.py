@@ -1,15 +1,18 @@
 from typing import Any, TypedDict, Optional, Callable, TYPE_CHECKING
 from re import sub
-from flask.json import jsonify
 from os import getcwd, path
+import json
+from jsonclasses.json_encoder import JSONEncoder
 from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
 from jsonclasses.excs import ObjectNotFoundException
+from fastapi import Response, File
+from fastapi.responses import JSONResponse
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
-if TYPE_CHECKING:
-    from fastapi import FastAPI, Response, Request
+
+
 
 class CorsSetting(TypedDict):
     allow_headers: Optional[str]
@@ -24,10 +27,9 @@ class OperatorSetting(TypedDict):
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
-from fastapi import Response, Request, encoders
-from fastapi.responses import JSONResponse
-def _exception_handler(request: Request, exception: Exception) -> Response:
-    from fastapi import HTTPException, applications
+
+def _exception_handler(_, exception: Exception) -> Response:
+    from fastapi import HTTPException, FastAPI
     from jsonclasses.excs import (ObjectNotFoundException,
                                   ValidationException,
                                   UniqueConstraintException,
@@ -37,10 +39,10 @@ def _exception_handler(request: Request, exception: Exception) -> Response:
     code = 400 if isinstance(exception, ValidationException) else code
     code = 400 if isinstance(exception, UniqueConstraintException) else code
     code = 401 if isinstance(exception, UnauthorizedActionException) else code
-    if applications.FastAPI.debug:
+    if FastAPI.debug == True:
         if code == 500:
-            print_exception(etype=type[exception], value=exception, tb=exception.__traceback__)
-            message = encoders.jsonable_encoder({
+            print_exception(type[exception], value=exception, tb=exception.__traceback__)
+            message = {
                 'error': _remove_none({
                     'type': 'Internal Server Error',
                     'message': 'There is an internal server error.',
@@ -51,10 +53,10 @@ def _exception_handler(request: Request, exception: Exception) -> Response:
                                else None),
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
-            })
-            return JSONResponse(status_code=code, content=message)
+            }
+            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
         else:
-            message = encoders.jsonable_encoder({
+            message = {
                 'error': _remove_none({
                     'type': exception.__class__.__name__,
                     'message': str(exception),
@@ -63,20 +65,20 @@ def _exception_handler(request: Request, exception: Exception) -> Response:
                                else None),
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
-            })
-            return JSONResponse(status_code=code, content=message)
+            }
+            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
     else:
         if code == 500:
-            print_exception(etype=type[exception], value=exception, tb=exception.__traceback__)
-            message = encoders.jsonable_encoder({
+            print_exception(type[exception], value=exception, tb=exception.__traceback__)
+            message = {
                 'error': _remove_none({
                     'type': 'Internal Server Error',
                     'message': 'There is an internal server error.'
                 })
-            })
-            return JSONResponse(status_code=code, content=message)
+            }
+            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
         else:
-            message = encoders.jsonable_encoder({
+            message = {
                 'error': _remove_none({
                     'type': exception.__class__.__name__,
                     'message': str(exception),
@@ -84,8 +86,8 @@ def _exception_handler(request: Request, exception: Exception) -> Response:
                                if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
                                else None)
                 })
-            })
-            return JSONResponse(status_code=code, content=message)
+            }
+            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
 
 def _try_import_fastapi():
     try:
@@ -95,7 +97,7 @@ def _try_import_fastapi():
 
 def create_fastapi_server(graph: str = 'default',
                           cors: Optional[CorsSetting] = {},
-                          operator: Optional[OperatorSetting] = None) -> None:
+                          operator: Optional[OperatorSetting] = None) -> 'FastAPI':
     _try_import_fastapi()
     from pydantic import BaseSettings
     class Settings(BaseSettings):
@@ -150,6 +152,8 @@ def create_fastapi_server(graph: str = 'default',
         fastapi_url = sub(r':([^/]+)', '{\\1}', record.url)
         if record.kind == 'L':
             _install_l(record, app, fastapi_url)
+        elif record.kind == 'E':
+            _install_e(record, app, fastapi_url)
         elif record.kind == 'R':
             _install_r(record, app, fastapi_url)
         elif record.kind == 'C':
@@ -171,9 +175,18 @@ def _install_l(record: APIRecord, app: FastAPI, url: str) -> None:
     def list_all(request: Request):
         params = str(request._query_params)
         ctx = ACtx(qs=params if params else None)
-        from fastapi.encoders import jsonable_encoder
         [_, result] = lcallback(ctx)
-        return {"data": jsonable_encoder(result)}
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+
+def _install_e(record: APIRecord, app: FastAPI, url: str) -> None:
+    from fastapi import Request
+    ecallback = record.callback
+    @app.post(url)
+    async def ensure(request: Request):
+        ctx = ACtx(body=(await request.form() or await request.json()))
+        [_, result] = ecallback(ctx)
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+
 
 def _install_r(record: APIRecord, app: FastAPI, url: str) -> None:
     from fastapi import Request
@@ -182,9 +195,8 @@ def _install_r(record: APIRecord, app: FastAPI, url: str) -> None:
     def read_by_id(id: Any):
         ctx = ACtx(id=id)
         [_, result] = rcallback(ctx)
-        from fastapi.encoders import jsonable_encoder
         [_, result] = rcallback(ctx)
-        return {"data": jsonable_encoder(result)}
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
 
 def _install_c(record: APIRecord, app: FastAPI, url: str) -> None:
     from fastapi import Request
@@ -193,19 +205,16 @@ def _install_c(record: APIRecord, app: FastAPI, url: str) -> None:
     async def create(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = ccallback(ctx)
-        from fastapi.encoders import jsonable_encoder
-        return jsonable_encoder(result)
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
 
 def _install_u(record: APIRecord, app: FastAPI, url: str) -> None:
     from fastapi import Request
     ucallback = record.callback
     @app.patch(url)
     async def update(id: Any, request: Request):
-        data = await request.json()
-        ctx = ACtx(id=id, body=(data))
+        ctx = ACtx(id=id, body=(await request.json()))
         [_, result] = ucallback(ctx)
-        from fastapi.encoders import jsonable_encoder
-        return jsonable_encoder(result)
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
 
 def _install_d(record: APIRecord, app: FastAPI, url: str) -> None:
     dcallback = record.callback
@@ -221,5 +230,4 @@ def _install_s(record: APIRecord, app: FastAPI, url: str) -> None:
     async def create_session(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = scallback(ctx)
-        from fastapi.encoders import jsonable_encoder
-        return jsonable_encoder(result)
+        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
