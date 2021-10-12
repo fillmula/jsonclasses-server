@@ -20,7 +20,7 @@ setup(name='jsonclasses-server',
       zip_safe=False,
       url='https://github.com/fillmula/jsonclasses-server',
       include_package_data=True,
-      python_requires='>=3.9',
+      python_requires='>=3.10',
       install_requires=[
             'jsonclasses-orm>=2.8.0,<4.0.0',
             'qsparser>=1.0.1,<2.0.0',
