@@ -1,13 +1,12 @@
 from typing import Any, TypedDict, Optional, Callable, TYPE_CHECKING
 from re import sub
 from os import getcwd, path
-import json
+from json import dumps
 from jsonclasses.json_encoder import JSONEncoder
 from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
 from jsonclasses.excs import ObjectNotFoundException
-from fastapi import Response, File
-from fastapi.responses import JSONResponse
+from fastapi import Response, FastAPI
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
@@ -54,7 +53,7 @@ def _exception_handler(_, exception: Exception) -> Response:
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
             }
-            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
         else:
             message = {
                 'error': _remove_none({
@@ -66,7 +65,7 @@ def _exception_handler(_, exception: Exception) -> Response:
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
             }
-            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
     else:
         if code == 500:
             print_exception(type[exception], value=exception, tb=exception.__traceback__)
@@ -76,7 +75,7 @@ def _exception_handler(_, exception: Exception) -> Response:
                     'message': 'There is an internal server error.'
                 })
             }
-            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
         else:
             message = {
                 'error': _remove_none({
@@ -87,7 +86,7 @@ def _exception_handler(_, exception: Exception) -> Response:
                                else None)
                 })
             }
-            return Response(media_type="application/json", content=json.dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
 
 def _try_import_fastapi():
     try:
@@ -131,7 +130,7 @@ def create_fastapi_server(graph: str = 'default',
             id = decode(token, key, algorithms=['HS256'])['operator']
             cls = settings['jsonclasses_operator_cls']
             return cls.id(id).exec()
-        async def SetOperatorModdleware(request: Request, call_next):
+        async def SetOperatorMiddleware(request: Request, call_next):
             from werkzeug.exceptions import Unauthorized
             from jwt import DecodeError
             if 'authorization' not in request.headers:
@@ -167,8 +166,7 @@ def create_fastapi_server(graph: str = 'default',
     return app
 
 
-from fastapi import FastAPI
-def _install_l(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_l(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     lcallback = record.callback
     @app.get(url)
@@ -176,19 +174,19 @@ def _install_l(record: APIRecord, app: FastAPI, url: str) -> None:
         params = str(request._query_params)
         ctx = ACtx(qs=params if params else None)
         [_, result] = lcallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
 
-def _install_e(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     ecallback = record.callback
     @app.post(url)
     async def ensure(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = ecallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
 
 
-def _install_r(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_r(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     rcallback = record.callback
     @app.get(url)
@@ -196,38 +194,38 @@ def _install_r(record: APIRecord, app: FastAPI, url: str) -> None:
         ctx = ACtx(id=id)
         [_, result] = rcallback(ctx)
         [_, result] = rcallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
 
-def _install_c(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_c(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     ccallback = record.callback
     @app.post(url)
     async def create(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = ccallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
 
-def _install_u(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_u(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     ucallback = record.callback
     @app.patch(url)
     async def update(id: Any, request: Request):
         ctx = ACtx(id=id, body=(await request.json()))
         [_, result] = ucallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
 
-def _install_d(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_d(record: APIRecord, app: 'FastAPI', url: str) -> None:
     dcallback = record.callback
     @app.delete(url, status_code=204)
     def delete(id: Any) -> None:
         ctx = ACtx(id=id)
         dcallback(ctx)
 
-def _install_s(record: APIRecord, app: FastAPI, url: str) -> None:
+def _install_s(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     scallback = record.callback
     @app.post(url)
     async def create_session(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = scallback(ctx)
-        return Response(media_type="application/json", content=json.dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
