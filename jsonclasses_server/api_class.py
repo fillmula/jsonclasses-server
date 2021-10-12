@@ -85,6 +85,8 @@ class API:
                 raise Exception('authorizable unit not found')
             checker = cls.cdef.field_named(ab_name).fdef.auth_by_checker
             ctx = Ctx.rootctxp(obj, ab_name, getattr(obj, ab_name), ab_value)
+            newval = checker.modifier.transform(ctx)
+            ctx = Ctx.rootctxp(obj, ab_name, newval, ab_value)
             checker.modifier.validate(ctx)
             token = encode_jwt_token(obj, "abc", auth_conf.expires_in)
             srname = aconf.cname_to_srname(cls.__name__)
