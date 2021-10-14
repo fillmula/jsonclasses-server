@@ -126,19 +126,19 @@ class API:
 
     def record_c(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def c(actx: ACtx) -> Tuple[int, Any]:
-            result = cls(**(actx.body or {})).save()
+            result = cls(**(actx.body or {})).opby(actx.operator).save()
             return (200, result)
         self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
 
     def record_u(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def u(actx: ACtx) -> Tuple[int, Any]:
-            result = cls.id(actx.id).exec().set(**(actx.body or {})).save()
+            result = cls.id(actx.id).exec().opby(actx.operator).set(**(actx.body or {})).save()
             return (200, result)
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
     def record_d(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def d(actx: ACtx) -> Tuple[int, Any]:
-            cls.id(actx.id).exec().delete()
+            cls.id(actx.id).exec().opby(actx.operator).delete()
             return (204, None)
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
 
@@ -158,9 +158,9 @@ class API:
                     updater[k] = v
             result = cls.one(matcher).optional.exec()
             if result:
-                result.set(**updater).save()
+                result.opby(actx.operator).set(**updater).save()
             else:
-                result = cls(**actx.body).save()
+                result = cls(**actx.body).opby(actx.operator).save()
             return (200, result)
         self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
 

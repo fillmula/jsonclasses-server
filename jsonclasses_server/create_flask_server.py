@@ -1,10 +1,12 @@
 from __future__ import annotations
-from typing import Any, TypedDict, Optional, Callable, TYPE_CHECKING
+from typing import Any, Optional, Callable, TYPE_CHECKING
 from re import sub
 from os import getcwd, path
 from traceback import extract_tb, print_exception
-from jsonclasses_orm.orm_object import ORMObject
+from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import ObjectNotFoundException
+from jsonclasses_orm.orm_object import ORMObject
+from .decode_jwt_token import decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
@@ -13,47 +15,8 @@ if TYPE_CHECKING:
     from flask import Flask, Blueprint, Response
 
 
-class CorsSetting(TypedDict):
-    allow_headers: Optional[str]
-    allow_origin: Optional[str]
-    allow_methods: Optional[str]
-
-
-class OperatorSetting(TypedDict):
-    operator_cls: type[ORMObject]
-    encode_key: str
-
-
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
-
-
-
-def _decode_jwt_token(token: str) -> ORMObject:
-    from flask import current_app
-    from jwt import decode
-    key = current_app.config['jsonclasses_encode_key']
-    id = decode(token, key, algorithms=['HS256'])['operator']
-    cls = current_app.config['jsonclasses_operator_cls']
-    return cls.id(id).exec()
-
-
-def _set_operator():
-    from flask import request, g
-    from werkzeug.exceptions import Unauthorized
-    from jwt import DecodeError
-    if 'authorization' not in request.headers:
-        g.operator = None
-        return
-    authorization = request.headers['authorization']
-    token = authorization[7:]
-    try:
-        decoded = _decode_jwt_token(token)
-    except DecodeError:
-        raise Unauthorized('authorization token is invalid')
-    except ObjectNotFoundException:
-        raise Unauthorized('user is not authorized')
-    g.operator = decoded
 
 
 def _ensure_operator():
@@ -70,24 +33,24 @@ def _encode_jwt_token(operator: ORMObject) -> str:
     return encode({'operator': operator._id}, key, algorithm='HS256')
 
 
-def _handle_cors_options(cors: CorsSetting) -> Callable[[], Optional[Response]]:
+def _handle_cors_options(cors: dict[str, str]) -> Callable[[], Optional[Response]]:
     from flask import request, current_app
     def handler():
         if request.method == 'OPTIONS':
             res = current_app.response_class()
             res.status_code = 204
-            res.headers['Access-Control-Allow-Origin'] = cors.get('allow_origin') or '*'
-            res.headers['Access-Control-Allow-Methods'] = cors.get('allow_methods') or 'OPTIONS, POST, GET, PATCH, DELETE'
-            res.headers['Access-Control-Allow-Headers'] = cors.get('allow_headers') or '*'
-            res.headers['Access-Control-Max-Age'] = '86400'
+            res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
+            res.headers['Access-Control-Allow-Methods'] = cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE'
+            res.headers['Access-Control-Allow-Headers'] = cors.get('allowHeaders') or '*'
+            res.headers['Access-Control-Max-Age'] = cors.get('maxAge') or '86400'
             return res
     return handler
 
 
-def _add_cors_headers(cors: CorsSetting) -> Callable[[Response], Response]:
+def _add_cors_headers(cors: dict[str, str]) -> Callable[[Response], Response]:
     def handler(response: Response) -> Response:
         res = response
-        res.headers['Access-Control-Allow-Origin'] = cors.get('allow_origin') or '*'
+        res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
         return res
     return handler
 
@@ -152,7 +115,6 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
             }), code
 
 
-
 def _try_import_flask():
     try:
         from flask import Flask
@@ -160,9 +122,7 @@ def _try_import_flask():
         raise 'please install flask in order to use create_flask_server'
 
 
-def create_flask_server(graph: str = 'default',
-                        cors: Optional[CorsSetting] = None,
-                        operator: Optional[OperatorSetting] = None) -> Flask:
+def create_flask_server(graph: str = 'default') -> Flask:
     _try_import_flask()
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     app = Flask('app')
@@ -174,12 +134,27 @@ def create_flask_server(graph: str = 'default',
                 return o.tojson()
             return super().default(o)
     app.json_encoder = JSJSONEncoder
+    conf = user_conf()
     app.register_error_handler(Exception, _exception_handler)
-    app.before_request(_handle_cors_options(cors or {}))
-    app.after_request(_add_cors_headers(cors or {}))
-    if operator is not None:
-        app.config['jsonclasses_operator_cls'] = operator['operator_cls']
-        app.config['jsonclasses_encode_key'] = operator['encode_key']
+    app.before_request(_handle_cors_options(conf.get('cors') or {}))
+    app.after_request(_add_cors_headers(conf.get('cors') or {}))
+    if conf.get('operator') is not None:
+        def _set_operator():
+            from flask import request, g
+            from werkzeug.exceptions import Unauthorized
+            from jwt import DecodeError
+            if 'authorization' not in request.headers:
+                g.operator = None
+                return
+            authorization = request.headers['authorization']
+            token = authorization[7:]
+            try:
+                decoded = decode_jwt_token(token, graph)
+            except DecodeError:
+                raise Unauthorized('authorization token is invalid')
+            except ObjectNotFoundException:
+                raise Unauthorized('auth unit is not authorized')
+            g.operator = decoded
         app.before_request(_set_operator)
     for record in API(graph).records:
         flask_url = sub(r':([^/]+)', '<\\1>', record.url)
@@ -206,7 +181,8 @@ def _install_l(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     lcallback = record.callback
     def list_all():
-        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None)
+        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None,
+                   operator=g.operator)
         [_, result] = lcallback(ctx)
         return jsonify(data=result)
     bp.get(url)(list_all)
@@ -216,7 +192,7 @@ def _install_r(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     rcallback = record.callback
     def read_by_id(id: Any):
-        ctx = ACtx(id=id)
+        ctx = ACtx(id=id, operator=g.operator)
         [_, result] = rcallback(ctx)
         return jsonify(data=result)
     bp.get(url)(read_by_id)
@@ -226,7 +202,8 @@ def _install_c(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ccallback = record.callback
     def create():
-        ctx = ACtx(body=(request.form | request.files or request.json))
+        ctx = ACtx(body=(request.form | request.files or request.json),
+                   operator=g.operator)
         [_, result] = ccallback(ctx)
         return jsonify(data=result)
     bp.post(url)(create)
@@ -236,7 +213,8 @@ def _install_u(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ucallback = record.callback
     def update(id: Any):
-        ctx = ACtx(id=id, body=((request.form | request.files) or request.json))
+        ctx = ACtx(id=id, body=((request.form | request.files) or request.json),
+                   operator=g.operator)
         [_, result] = ucallback(ctx)
         return jsonify(data=result)
     bp.patch(url)(update)
@@ -246,7 +224,7 @@ def _install_d(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     dcallback = record.callback
     def delete(id: Any):
-        ctx = ACtx(id=id)
+        ctx = ACtx(id=id, operator=g.operator)
         dcallback(ctx)
         return make_response('', 204)
     bp.delete(url)(delete)
@@ -256,7 +234,8 @@ def _install_s(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     scallback = record.callback
     def create_session():
-        ctx = ACtx(body=(request.form | request.files or request.json))
+        ctx = ACtx(body=(request.form | request.files or request.json),
+                   operator=g.operator)
         [_, result] = scallback(ctx)
         return jsonify(data=result)
     bp.post(url)(create_session)
@@ -266,7 +245,8 @@ def _install_e(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ecallback = record.callback
     def ensure():
-        ctx = ACtx(body=(request.form | request.files or request.json))
+        ctx = ACtx(body=(request.form | request.files or request.json),
+                   operator=g.operator)
         [_, result] = ecallback(ctx)
         return jsonify(data=result)
     bp.post(url)(ensure)

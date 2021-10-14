@@ -1,12 +1,16 @@
 from __future__ import annotations
 from datetime import timedelta, datetime
+from jsonclasses.user_conf import user_conf
 from jsonclasses_orm.orm_object import ORMObject
 
 
-def encode_jwt_token(operator: ORMObject, secret_key: str, expired_in: timedelta) -> str:
+def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:
     from jwt import encode
+    operator_conf = user_conf().get('operator')
+    secret_key = operator_conf.get('secretKey')
     data = {
-        'operator': operator._id,
+        'class': operator.__class__.name,
+        'id': operator._id,
         'expired_at': (datetime.now() + expired_in).timestamp()
     }
     return encode(data, secret_key, algorithm='HS256')
