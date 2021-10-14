@@ -89,7 +89,7 @@ class API:
             newval = checker.modifier.transform(ctx)
             ctx = Ctx.rootctxp(obj, ab_name, newval, ab_value)
             checker.modifier.validate(ctx)
-            token = encode_jwt_token(obj, "abc", auth_conf.expires_in)
+            token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = aconf.cname_to_srname(cls.__name__)
             return (200, {'token': token, srname: obj})
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))

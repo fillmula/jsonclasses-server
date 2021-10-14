@@ -6,7 +6,6 @@ from jsonclasses.json_encoder import JSONEncoder
 from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
 from jsonclasses.excs import ObjectNotFoundException
-from fastapi import Response, FastAPI
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
@@ -27,7 +26,7 @@ def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
 
-def _exception_handler(_, exception: Exception) -> Response:
+def _exception_handler(_, exception: Exception) -> 'Response':
     from fastapi import HTTPException, FastAPI
     from jsonclasses.excs import (ObjectNotFoundException,
                                   ValidationException,

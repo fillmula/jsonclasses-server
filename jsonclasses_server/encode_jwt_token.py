@@ -9,7 +9,7 @@ def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:
     operator_conf = user_conf().get('operator')
     secret_key = operator_conf.get('secretKey')
     data = {
-        'class': operator.__class__.name,
+        'class': operator.__class__.__name__,
         'id': operator._id,
         'expired_at': (datetime.now() + expired_in).timestamp()
     }
