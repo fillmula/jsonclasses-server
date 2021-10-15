@@ -3,17 +3,22 @@ from re import sub
 from os import getcwd, path
 from json import dumps
 from jsonclasses.json_encoder import JSONEncoder
+from starlette.responses import JSONResponse
 from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
 from jsonclasses.user_conf import user_conf
-from jsonclasses.excs import ObjectNotFoundException
+from .excs import AuthenticationException
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from jsonclasses.excs import (ObjectNotFoundException,
+                              ValidationException,
+                              UniqueConstraintException,
+                              UnauthorizedActionException)
 from .decode_jwt_token import decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
 from fastapi import Response, FastAPI
 from pydantic import BaseSettings
-from .excs import AuthenticationException
 
 
 class Settings(BaseSettings):
@@ -23,72 +28,56 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+class WrappedException(StarletteHTTPException):
+    def __init__(self, exc: Exception) -> None:
+        from fastapi import HTTPException
+        code = exc.code if isinstance(exc, HTTPException) else 500
+        code = 404 if isinstance(exc, ObjectNotFoundException) else code
+        code = 400 if isinstance(exc, ValidationException) else code
+        code = 400 if isinstance(exc, UniqueConstraintException) else code
+        code = 401 if isinstance(exc, UnauthorizedActionException) else code
+        code = 400 if isinstance(exc, AuthenticationException) else code
+        super().__init__(status_code=code, detail=str(exc))
+        self.exc = exc
+
 
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
 
-def _exception_handler(_, exception: Exception) -> 'Response':
-    from fastapi import HTTPException, FastAPI
-    from jsonclasses.excs import (ObjectNotFoundException,
-                                  ValidationException,
-                                  UniqueConstraintException,
-                                  UnauthorizedActionException)
-    code = exception.code if isinstance(exception, HTTPException) else 500
-    code = 404 if isinstance(exception, ObjectNotFoundException) else code
-    code = 400 if isinstance(exception, ValidationException) else code
-    code = 400 if isinstance(exception, UniqueConstraintException) else code
-    code = 401 if isinstance(exception, UnauthorizedActionException) else code
-    code = 400 if isinstance(exception, AuthenticationException) else code
-    if FastAPI.debug == True:
-        if code == 500:
-            print_exception(type[exception], value=exception, tb=exception.__traceback__)
-            message = {
-                'error': _remove_none({
-                    'type': 'Internal Server Error',
-                    'message': 'There is an internal server error.',
-                    'error_type': exception.__class__.__name__,
-                    'error_message': str(exception),
-                    'fields': (exception.keypath_messages
-                               if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
-                               else None),
-                    'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
-                })
-            }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
-        else:
-            message = {
-                'error': _remove_none({
-                    'type': exception.__class__.__name__,
-                    'message': str(exception),
-                    'fields': (exception.keypath_messages
-                               if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
-                               else None),
-                    'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
-                })
-            }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
-    else:
-        if code == 500:
-            print_exception(type[exception], value=exception, tb=exception.__traceback__)
+def _exception_handler(exception: StarletteHTTPException) -> Response:
+    if isinstance(exception, WrappedException):
+        exc = exception.exc
+        if exception.status_code == 500:
+            print_exception(type[exc], value=exc, tb=exc.__traceback__)
             message = {
                 'error': _remove_none({
                     'type': 'Internal Server Error',
                     'message': 'There is an internal server error.'
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
         else:
             message = {
                 'error': _remove_none({
-                    'type': exception.__class__.__name__,
-                    'message': str(exception),
-                    'fields': (exception.keypath_messages
-                               if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
-                               else None)
+                    'type': exc.__class__.__name__,
+                    'message': str(exc),
+                    'fields': (exc.keypath_messages
+                            if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
+                            else None)
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+    else:
+        print_exception(type[exception], value=exception, tb=exception.__traceback__)
+        message = {
+            'error': _remove_none({
+                'type': exception.__class__.__name__,
+                'message': exception.detail
+            })
+        }
+        return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+
 
 def _try_import_fastapi():
     try:
@@ -100,7 +89,9 @@ def create_fastapi_server(graph: str = 'default') -> 'FastAPI':
     _try_import_fastapi()
     from fastapi import FastAPI, Request
     app = FastAPI()
-    app.add_exception_handler(Exception, _exception_handler)
+    @app.exception_handler(StarletteHTTPException)
+    async def exception_callback(request: Request, exception: StarletteHTTPException):
+        return _exception_handler(exception)
     conf = user_conf()
     cors = conf.get('cors') or {}
     from fastapi.middleware.cors import CORSMiddleware
@@ -157,8 +148,12 @@ def _install_l(record: APIRecord, app: 'FastAPI', url: str) -> None:
     @app.get(url)
     def list_all(request: Request):
         ctx = ACtx(qs=request.scope.get("query_string", bytes()).decode("utf-8"), operator=settings.operator)
-        [_, result] = lcallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = lcallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            raise WrappedException(e)
+
 
 
 def _install_r(record: APIRecord, app: 'FastAPI', url: str) -> None:
@@ -167,9 +162,12 @@ def _install_r(record: APIRecord, app: 'FastAPI', url: str) -> None:
     @app.get(url)
     def read_by_id(id: Any, request: Request):
         ctx = ACtx(id=id, qs=request.scope.get("query_string", bytes()).decode("utf-8"))
-        [_, result] = rcallback(ctx)
-        [_, result] = rcallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = rcallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            print(e)
+            raise WrappedException(e)
 
 def _install_c(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
@@ -179,8 +177,11 @@ def _install_c(record: APIRecord, app: 'FastAPI', url: str) -> None:
         ctx = ACtx(body=(await request.form() or await request.json()),
                    qs=request.scope.get("query_string", bytes()).decode("utf-8"),
                    operator=settings.operator)
-        [_, result] = ccallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = ccallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            raise WrappedException(e)
 
 def _install_u(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
@@ -189,15 +190,21 @@ def _install_u(record: APIRecord, app: 'FastAPI', url: str) -> None:
     async def update(id: Any, request: Request):
         ctx = ACtx(id=id, body=(await request.json()),
                    qs=request.scope.get("query_string", bytes()).decode("utf-8"))
-        [_, result] = ucallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = ucallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            raise WrappedException(e)
 
 def _install_d(record: APIRecord, app: 'FastAPI', url: str) -> None:
     dcallback = record.callback
     @app.delete(url, status_code=204)
     def delete(id: Any) -> None:
         ctx = ACtx(id=id)
-        dcallback(ctx)
+        try:
+            dcallback(ctx)
+        except Exception as e:
+            raise WrappedException(e)
 
 def _install_s(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
@@ -205,8 +212,11 @@ def _install_s(record: APIRecord, app: 'FastAPI', url: str) -> None:
     @app.post(url)
     async def create_session(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
-        [_, result] = scallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = scallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            raise WrappedException(e)
 
 
 def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
@@ -215,5 +225,8 @@ def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
     @app.post(url)
     async def ensure(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
-        [_, result] = ecallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        try:
+            [_, result] = ecallback(ctx)
+            return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+        except Exception as e:
+            raise WrappedException(e)
