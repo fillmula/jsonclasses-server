@@ -5,22 +5,23 @@ from json import dumps
 from jsonclasses.json_encoder import JSONEncoder
 from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
+from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import ObjectNotFoundException
+from .decode_jwt_token import decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
+from fastapi import Response, FastAPI
+from pydantic import BaseSettings
 
 
+class Settings(BaseSettings):
+    jsonclasses_operator_cls: Optional[type[ORMObject]]
+    jsonclasses_encode_key: Optional[str]
+    operator: Optional[Any]
 
-class CorsSetting(TypedDict):
-    allow_headers: Optional[str]
-    allow_origin: Optional[str]
-    allow_methods: Optional[str]
+settings = Settings()
 
-
-class OperatorSetting(TypedDict):
-    operator_cls: type[ORMObject]
-    encode_key: str
 
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
@@ -52,7 +53,7 @@ def _exception_handler(_, exception: Exception) -> 'Response':
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
         else:
             message = {
                 'error': _remove_none({
@@ -64,7 +65,7 @@ def _exception_handler(_, exception: Exception) -> 'Response':
                     'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
     else:
         if code == 500:
             print_exception(type[exception], value=exception, tb=exception.__traceback__)
@@ -74,7 +75,7 @@ def _exception_handler(_, exception: Exception) -> 'Response':
                     'message': 'There is an internal server error.'
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
         else:
             message = {
                 'error': _remove_none({
@@ -85,7 +86,7 @@ def _exception_handler(_, exception: Exception) -> 'Response':
                                else None)
                 })
             }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder), status_code=code)
+            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=code)
 
 def _try_import_fastapi():
     try:
@@ -93,23 +94,13 @@ def _try_import_fastapi():
     except ModuleNotFoundError:
         raise 'please install fastapi in order to use create_fastapi_server'
 
-def create_fastapi_server(graph: str = 'default',
-                          cors: Optional[CorsSetting] = {},
-                          operator: Optional[OperatorSetting] = None) -> 'FastAPI':
+def create_fastapi_server(graph: str = 'default') -> 'FastAPI':
     _try_import_fastapi()
-    from pydantic import BaseSettings
-    class Settings(BaseSettings):
-        jsonclasses_operator_cls: Optional[type[ORMObject]]
-        jsonclasses_encode_key: Optional[str]
-        operator: Optional[Any]
-    settings = Settings()
     from fastapi import FastAPI, Request
     app = FastAPI()
-    from functools import lru_cache
-    @lru_cache()
-    def get_settings():
-        return Settings()
     app.add_exception_handler(Exception, _exception_handler)
+    conf = user_conf()
+    cors = conf.get('cors') or {}
     from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(
         CORSMiddleware,
@@ -119,26 +110,19 @@ def create_fastapi_server(graph: str = 'default',
         allow_headers=[cors.get('allow_headers')] if cors.get('allow_headers') is not None else ['*'],
         max_age=86400
     )
-    if operator is not None:
-        settings.jsonclasses_operator_cls = operator['operator_cls']
-        settings.jsonclasses_encode_key = operator['encode_key']
+    if conf.get('operator') is not None:
         @app.middleware("http")
-        def _decode_jwt_token(token: str) -> ORMObject:
-            from jwt import decode
-            key = settings['jsonclasses_encode_key']
-            id = decode(token, key, algorithms=['HS256'])['operator']
-            cls = settings['jsonclasses_operator_cls']
-            return cls.id(id).exec()
         async def SetOperatorMiddleware(request: Request, call_next):
             from werkzeug.exceptions import Unauthorized
             from jwt import DecodeError
             if 'authorization' not in request.headers:
                 settings.operator = None
-                return
+                response = await call_next(request)
+                return response
             authorization = request.headers['authorization']
             token = authorization[7:]
             try:
-                decoded = _decode_jwt_token(token)
+                decoded = decode_jwt_token(token, graph)
             except DecodeError:
                 raise Unauthorized('authorization token is invalid')
             except ObjectNotFoundException:
@@ -170,48 +154,41 @@ def _install_l(record: APIRecord, app: 'FastAPI', url: str) -> None:
     lcallback = record.callback
     @app.get(url)
     def list_all(request: Request):
-        params = str(request._query_params)
-        ctx = ACtx(qs=params if params else None)
+        ctx = ACtx(qs=request.scope.get("query_string", bytes()).decode("utf-8"), operator=settings.operator)
         [_, result] = lcallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
-
-def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
-    from fastapi import Request
-    ecallback = record.callback
-    @app.post(url)
-    async def ensure(request: Request):
-        ctx = ACtx(body=(await request.form() or await request.json()))
-        [_, result] = ecallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
 
 
 def _install_r(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     rcallback = record.callback
     @app.get(url)
-    def read_by_id(id: Any):
-        ctx = ACtx(id=id)
+    def read_by_id(id: Any, request: Request):
+        ctx = ACtx(id=id, qs=request.scope.get("query_string", bytes()).decode("utf-8"))
         [_, result] = rcallback(ctx)
         [_, result] = rcallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
 
 def _install_c(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     ccallback = record.callback
     @app.post(url)
     async def create(request: Request):
-        ctx = ACtx(body=(await request.form() or await request.json()))
+        ctx = ACtx(body=(await request.form() or await request.json()),
+                   qs=request.scope.get("query_string", bytes()).decode("utf-8"),
+                   operator=settings.operator)
         [_, result] = ccallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
 
 def _install_u(record: APIRecord, app: 'FastAPI', url: str) -> None:
     from fastapi import Request
     ucallback = record.callback
     @app.patch(url)
     async def update(id: Any, request: Request):
-        ctx = ACtx(id=id, body=(await request.json()))
+        ctx = ACtx(id=id, body=(await request.json()),
+                   qs=request.scope.get("query_string", bytes()).decode("utf-8"))
         [_, result] = ucallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
 
 def _install_d(record: APIRecord, app: 'FastAPI', url: str) -> None:
     dcallback = record.callback
@@ -227,4 +204,14 @@ def _install_s(record: APIRecord, app: 'FastAPI', url: str) -> None:
     async def create_session(request: Request):
         ctx = ACtx(body=(await request.form() or await request.json()))
         [_, result] = scallback(ctx)
-        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder))
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
+
+
+def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
+    from fastapi import Request
+    ecallback = record.callback
+    @app.post(url)
+    async def ensure(request: Request):
+        ctx = ACtx(body=(await request.form() or await request.json()))
+        [_, result] = ecallback(ctx)
+        return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))

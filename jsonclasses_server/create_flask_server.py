@@ -192,7 +192,8 @@ def _install_r(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     rcallback = record.callback
     def read_by_id(id: Any):
-        ctx = ACtx(id=id, operator=g.operator)
+        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None,
+                   id=id, operator=g.operator)
         [_, result] = rcallback(ctx)
         return jsonify(data=result)
     bp.get(url)(read_by_id)
@@ -202,7 +203,8 @@ def _install_c(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ccallback = record.callback
     def create():
-        ctx = ACtx(body=(request.form | request.files or request.json),
+        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None,
+                   body=(request.form | request.files or request.json),
                    operator=g.operator)
         [_, result] = ccallback(ctx)
         return jsonify(data=result)
@@ -213,7 +215,8 @@ def _install_u(record: APIRecord, bp: Blueprint, url: str) -> None:
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     ucallback = record.callback
     def update(id: Any):
-        ctx = ACtx(id=id, body=((request.form | request.files) or request.json),
+        ctx = ACtx(qs=request.query_string.decode("utf-8") if request.query_string else None,
+                   id=id, body=((request.form | request.files) or request.json),
                    operator=g.operator)
         [_, result] = ucallback(ctx)
         return jsonify(data=result)
