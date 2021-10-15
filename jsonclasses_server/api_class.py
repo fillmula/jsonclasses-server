@@ -120,7 +120,7 @@ class API:
 
     def record_r(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def r(actx: ACtx) -> Tuple[int, Any]:
-            result = cls.id(actx.id).exec()
+            result = cls.id(actx.id, actx.qs).exec()
             return (200, result)
         self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
 
@@ -132,7 +132,7 @@ class API:
 
     def record_u(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def u(actx: ACtx) -> Tuple[int, Any]:
-            result = cls.id(actx.id).exec().opby(actx.operator).set(**(actx.body or {})).save()
+            result = cls.id(actx.id, actx.qs).exec().opby(actx.operator).set(**(actx.body or {})).save()
             return (200, result)
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
