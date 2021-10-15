@@ -85,9 +85,10 @@ def _try_import_fastapi():
     except ModuleNotFoundError:
         raise 'please install fastapi in order to use create_fastapi_server'
 
+
 def create_fastapi_server(graph: str = 'default') -> 'FastAPI':
     _try_import_fastapi()
-    from fastapi import FastAPI, Request
+    from fastapi import FastAPI, Request, Response
     app = FastAPI()
     @app.exception_handler(StarletteHTTPException)
     async def exception_callback(request: Request, exception: StarletteHTTPException):
@@ -95,14 +96,17 @@ def create_fastapi_server(graph: str = 'default') -> 'FastAPI':
     conf = user_conf()
     cors = conf.get('cors') or {}
     from fastapi.middleware.cors import CORSMiddleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[cors.get('allow_origin')] if cors.get('allow_origin') is not None else ['*'],
-        allow_credentials=True,
-        allow_methods=[cors.get('allow_methods')] if cors.get('allow_methods') is not None else ['OPTIONS', 'POST', 'GET', 'PATCH', 'DELETE'],
-        allow_headers=[cors.get('allow_headers')] if cors.get('allow_headers') is not None else ['*'],
-        max_age=86400
-    )
+    def add_handle_cors_options(request: Request):
+        if request.method == 'OPTIONS':
+            app.add_middleware(
+                CORSMiddleware,
+                allow_origins=[cors.get('allow_origin')] if cors.get('allow_origin') is not None else ['*'],
+                allow_credentials=True,
+                allow_methods=[cors.get('allow_methods')] if cors.get('allow_methods') is not None else ['OPTIONS', 'POST', 'GET', 'PATCH', 'DELETE'],
+                allow_headers=[cors.get('allow_headers')] if cors.get('allow_headers') is not None else ['*'],
+                max_age=86400
+            )
+    add_handle_cors_options(Request)
     if conf.get('operator') is not None:
         @app.middleware("http")
         async def SetOperatorMiddleware(request: Request, call_next):
