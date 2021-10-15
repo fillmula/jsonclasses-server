@@ -13,6 +13,7 @@ from .actx import ACtx
 from .api_record import APIRecord
 from fastapi import Response, FastAPI
 from pydantic import BaseSettings
+from .excs import AuthenticationException
 
 
 class Settings(BaseSettings):
@@ -38,6 +39,7 @@ def _exception_handler(_, exception: Exception) -> 'Response':
     code = 400 if isinstance(exception, ValidationException) else code
     code = 400 if isinstance(exception, UniqueConstraintException) else code
     code = 401 if isinstance(exception, UnauthorizedActionException) else code
+    code = 400 if isinstance(exception, AuthenticationException) else code
     if FastAPI.debug == True:
         if code == 500:
             print_exception(type[exception], value=exception, tb=exception.__traceback__)
