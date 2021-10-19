@@ -110,7 +110,8 @@ def create_fastapi_server(graph: str = 'default') -> Any:
         @app.patch(url)
         async def update(id: Any, request: Request):
             ctx = ACtx(id=id, body=(await request.json()),
-                    qs=request.scope.get("query_string", bytes()).decode("utf-8"))
+                       qs=request.scope.get("query_string", bytes()).decode("utf-8"),
+                       operator=request.state.operator)
             try:
                 [_, result] = ucallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
