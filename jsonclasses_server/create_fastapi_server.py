@@ -29,25 +29,104 @@ def _try_import_fastapi():
 def create_fastapi_server(graph: str = 'default') -> Any:
     _try_import_fastapi()
     from fastapi import FastAPI, Request, Response
-    app = FastAPI()
     from starlette.exceptions import HTTPException as StarletteHTTPException
-    @app.exception_handler(StarletteHTTPException)
-    async def exception_callback(request: Request, exception: StarletteHTTPException):
-        return _exception_handler(exception)
+
+    app = FastAPI()
     conf = user_conf()
     cors = conf.get('cors') or {}
-    from fastapi.middleware.cors import CORSMiddleware
-    app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[cors.get('allow_origin')] if cors.get('allow_origin') is not None else ['*'],
-            allow_credentials=True,
-            allow_methods=[cors.get('allow_methods')] if cors.get('allow_methods') is not None else ['OPTIONS', 'POST', 'GET', 'PATCH', 'DELETE'],
-            allow_headers=[cors.get('allow_headers')] if cors.get('allow_headers') is not None else ['*'],
-            max_age=86400
-            )
-    if conf.get('operator') is not None:
-        @app.middleware("http")
-        async def SetOperatorMiddleware(request: Request, call_next):
+
+    def _exception_handler(request: Request, exception: StarletteHTTPException) -> Response:
+        if app.debug == True:
+            if isinstance(exception, WrappedException):
+                exc = exception.exc
+                if exception.status_code == 500:
+                    print_exception(type[exc], value=exc, tb=exc.__traceback__)
+                    message = {
+                        'error': _remove_none({
+                            'type': 'Internal Server Error',
+                            'message': 'There is an internal server error.',
+                            'error_type': exception.__class__.__name__,
+                            'error_message': str(exception),
+                            'fields': (exception.keypath_messages
+                                    if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
+                                    else None),
+                            'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
+                                })
+                    }
+                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                else:
+                    message = {
+                        'error': _remove_none({
+                            'type': exc.__class__.__name__,
+                            'message': str(exc),
+                            'fields': (exc.keypath_messages
+                                    if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
+                                    else None),
+                            'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
+                        })
+                    }
+                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+            else:
+                print_exception(type[exception], value=exception, tb=exception.__traceback__)
+                message = {
+                    'error': _remove_none({
+                        'type': exception.__class__.__name__,
+                        'message': exception.detail,
+                        'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
+                    })
+                }
+                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+        else:
+            if isinstance(exception, WrappedException):
+                exc = exception.exc
+                if exception.status_code == 500:
+                    print_exception(type[exc], value=exc, tb=exc.__traceback__)
+                    message = {
+                        'error': _remove_none({
+                            'type': 'Internal Server Error',
+                            'message': 'There is an internal server error.'
+                        })
+                    }
+                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                else:
+                    message = {
+                        'error': _remove_none({
+                            'type': exc.__class__.__name__,
+                            'message': str(exc),
+                            'fields': (exc.keypath_messages
+                                    if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
+                                    else None)
+                        })
+                    }
+                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+            else:
+                print_exception(type[exception], value=exception, tb=exception.__traceback__)
+                message = {
+                    'error': _remove_none({
+                        'type': exception.__class__.__name__,
+                        'message': exception.detail
+                    })
+                }
+                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+
+    from jsonclasses.excs import (ValidationException,
+                                  UniqueConstraintException,
+                                  UnauthorizedActionException)
+    class WrappedException(StarletteHTTPException):
+        def __init__(self, exc: Exception) -> None:
+            from fastapi import HTTPException
+            code = exc.code if isinstance(exc, HTTPException) else 500
+            code = 404 if isinstance(exc, ObjectNotFoundException) else code
+            code = 400 if isinstance(exc, ValidationException) else code
+            code = 400 if isinstance(exc, UniqueConstraintException) else code
+            code = 401 if isinstance(exc, UnauthorizedActionException) else code
+            code = 400 if isinstance(exc, AuthenticationException) else code
+            super().__init__(status_code=code, detail=str(exc))
+            self.exc = exc
+
+    from starlette.middleware.base import BaseHTTPMiddleware
+    class SetOperatorMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
             from werkzeug.exceptions import Unauthorized
             from jwt import DecodeError
             if 'authorization' not in request.headers:
@@ -65,6 +144,20 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             request.state.operator = decoded
             response = await call_next(request)
             return response
+
+    class HandleCorsHeadersMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            if request.method == 'OPTIONS':
+                return Response(status_code=204, headers={
+                    'Access-Control-Allow-Origin': cors.get('allowOrigin') or '*',
+                    'Access-Control-Allow-Methods': cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE',
+                    'Access-Control-Allow-Headers': cors.get('allowHeaders') or '*',
+                    'Access-Control-Max-Age': cors.get('maxAge') or '86400'
+                })
+            else:
+                res = await call_next(request)
+                res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
+                return res
 
     def _install_l(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -140,7 +233,6 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             except Exception as e:
                 raise WrappedException(e)
 
-
     def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
         ecallback = record.callback
@@ -152,6 +244,11 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
                 raise WrappedException(e)
+
+    app.add_exception_handler(StarletteHTTPException, _exception_handler)
+    if conf.get('operator') is not None:
+       app.add_middleware(SetOperatorMiddleware)
+    app.add_middleware(HandleCorsHeadersMiddleware)
     for record in API(graph).records:
         fastapi_url = sub(r':([^/]+)', '{\\1}', record.url)
         if record.kind == 'L':
@@ -168,52 +265,4 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
-
-    from jsonclasses.excs import (ValidationException,
-                                        UniqueConstraintException,
-                                        UnauthorizedActionException)
-    class WrappedException(StarletteHTTPException):
-        def __init__(self, exc: Exception) -> None:
-            from fastapi import HTTPException
-            code = exc.code if isinstance(exc, HTTPException) else 500
-            code = 404 if isinstance(exc, ObjectNotFoundException) else code
-            code = 400 if isinstance(exc, ValidationException) else code
-            code = 400 if isinstance(exc, UniqueConstraintException) else code
-            code = 401 if isinstance(exc, UnauthorizedActionException) else code
-            code = 400 if isinstance(exc, AuthenticationException) else code
-            super().__init__(status_code=code, detail=str(exc))
-            self.exc = exc
-
-    def _exception_handler(exception: StarletteHTTPException) -> Response:
-        if isinstance(exception, WrappedException):
-            exc = exception.exc
-            if exception.status_code == 500:
-                print_exception(type[exc], value=exc, tb=exc.__traceback__)
-                message = {
-                    'error': _remove_none({
-                        'type': 'Internal Server Error',
-                        'message': 'There is an internal server error.'
-                    })
-                }
-                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
-            else:
-                message = {
-                    'error': _remove_none({
-                        'type': exc.__class__.__name__,
-                        'message': str(exc),
-                        'fields': (exc.keypath_messages
-                                if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
-                                else None)
-                    })
-                }
-                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
-        else:
-            print_exception(type[exception], value=exception, tb=exception.__traceback__)
-            message = {
-                'error': _remove_none({
-                    'type': exception.__class__.__name__,
-                    'message': exception.detail
-                })
-            }
-            return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
     return app
