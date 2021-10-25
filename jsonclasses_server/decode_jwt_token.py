@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import timedelta, datetime
 from jsonclasses.cgraph import CGraph
 from jsonclasses.user_conf import user_conf
-from jsonclasses_orm.orm_object import ORMObject
+from jsonclasses.orm_object import ORMObject
 
 
 def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:

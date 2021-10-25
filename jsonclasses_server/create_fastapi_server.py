@@ -3,7 +3,6 @@ from re import sub
 from os import getcwd, path
 from json import dumps
 from jsonclasses.json_encoder import JSONEncoder
-from jsonclasses_orm.orm_object import ORMObject
 from traceback import extract_tb, print_exception
 from jsonclasses.user_conf import user_conf
 from .excs import AuthenticationException

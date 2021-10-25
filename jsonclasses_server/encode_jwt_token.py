@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import timedelta, datetime
 from jsonclasses.user_conf import user_conf
-from jsonclasses_orm.orm_object import ORMObject
+from jsonclasses.orm_object import ORMObject
 
 
 def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:

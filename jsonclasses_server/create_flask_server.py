@@ -5,7 +5,7 @@ from os import getcwd, path
 from traceback import extract_tb, print_exception
 from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import ObjectNotFoundException
-from jsonclasses_orm.orm_object import ORMObject
+from jsonclasses.orm_object import ORMObject
 from .decode_jwt_token import decode_jwt_token
 from .api_class import API
 from .actx import ACtx
