@@ -6,6 +6,10 @@ from jsonclasses.user_conf import user_conf
 from jsonclasses.orm_object import ORMObject
 
 
+default_operator_conf = {
+    "secretKey": "!@#$%^&*())(*&^%$#@"
+}
+
 def check_jwt_installed() -> None:
     packages = {'pyjwt': ('pyjwt', '>=2.1.0,<3.0.0')}
     check_and_install_packages(packages)
@@ -14,7 +18,7 @@ def check_jwt_installed() -> None:
 def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:
     check_jwt_installed()
     from jwt import decode
-    operator_conf = user_conf().get('operator')
+    operator_conf = user_conf().get('operator') or default_operator_conf
     secret_key = operator_conf.get('secretKey')
     decoded = decode(token, secret_key, algorithms=['HS256'])
     id = decoded['id']
@@ -28,7 +32,7 @@ def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:
 def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:
     check_jwt_installed()
     from jwt import encode
-    operator_conf = user_conf().get('operator')
+    operator_conf = user_conf().get('operator') or default_operator_conf
     secret_key = operator_conf.get('secretKey')
     data = {
         'class': operator.__class__.__name__,

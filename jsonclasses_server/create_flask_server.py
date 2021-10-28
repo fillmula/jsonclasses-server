@@ -122,25 +122,24 @@ def create_flask_server(graph: str = 'default') -> Flask:
     app.register_error_handler(Exception, _exception_handler)
     app.before_request(_handle_cors_options(conf.get('cors') or {}))
     app.after_request(_add_cors_headers(conf.get('cors') or {}))
-    if conf.get('operator') is not None:
-        def _set_operator():
-            from flask import request, g
-            from werkzeug.exceptions import Unauthorized
-            check_jwt_installed()
-            from jwt import DecodeError
-            if 'authorization' not in request.headers:
-                g.operator = None
-                return
-            authorization = request.headers['authorization']
-            token = authorization[7:]
-            try:
-                decoded = decode_jwt_token(token, graph)
-            except DecodeError:
-                raise Unauthorized('authorization token is invalid')
-            except ObjectNotFoundException:
-                raise Unauthorized('auth unit is not authorized')
-            g.operator = decoded
-        app.before_request(_set_operator)
+    def _set_operator():
+        from flask import request, g
+        from werkzeug.exceptions import Unauthorized
+        check_jwt_installed()
+        from jwt import DecodeError
+        if 'authorization' not in request.headers:
+            g.operator = None
+            return
+        authorization = request.headers['authorization']
+        token = authorization[7:]
+        try:
+            decoded = decode_jwt_token(token, graph)
+        except DecodeError:
+            raise Unauthorized('authorization token is invalid')
+        except ObjectNotFoundException:
+            raise Unauthorized('auth unit is not authorized')
+        g.operator = decoded
+    app.before_request(_set_operator)
     for record in API(graph).records:
         flask_url = sub(r':([^/]+)', '<\\1>', record.url)
         bp = Blueprint(record.uid, record.uid)
