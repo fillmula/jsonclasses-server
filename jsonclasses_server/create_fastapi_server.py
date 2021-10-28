@@ -8,7 +8,7 @@ from jsonclasses.user_conf import user_conf
 from .excs import AuthenticationException
 from jsonclasses.excs import ObjectNotFoundException
 from jsonclasses.pkgutils import check_and_install_packages
-from .decode_jwt_token import decode_jwt_token
+from .jwt_token import check_jwt_installed, decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
@@ -123,6 +123,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
     from starlette.middleware.base import BaseHTTPMiddleware
     class SetOperatorMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
+            check_jwt_installed()
             from werkzeug.exceptions import Unauthorized
             from jwt import DecodeError
             if 'authorization' not in request.headers:

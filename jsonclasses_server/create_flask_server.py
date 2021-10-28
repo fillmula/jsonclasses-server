@@ -6,8 +6,7 @@ from traceback import extract_tb, print_exception
 from jsonclasses.pkgutils import check_and_install_packages
 from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import ObjectNotFoundException
-from jsonclasses.orm_object import ORMObject
-from .decode_jwt_token import decode_jwt_token
+from .jwt_token import check_jwt_installed, decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
@@ -127,6 +126,7 @@ def create_flask_server(graph: str = 'default') -> Flask:
         def _set_operator():
             from flask import request, g
             from werkzeug.exceptions import Unauthorized
+            check_jwt_installed()
             from jwt import DecodeError
             if 'authorization' not in request.headers:
                 g.operator = None
