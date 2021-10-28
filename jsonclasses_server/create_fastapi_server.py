@@ -15,7 +15,7 @@ from .api_record import APIRecord
 
 
 def check_fastapi_installed() -> None:
-    packages = {'fastapi': ('fastapi', '>=0.66.0,<0.70.0')}
+    packages = {'fastapi': ('fastapi', '>=0.70.0,<0.71.0')}
     check_and_install_packages(packages)
 
 def _remove_none(obj: dict) -> dict:
