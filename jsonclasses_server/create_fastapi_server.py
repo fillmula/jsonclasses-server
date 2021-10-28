@@ -243,8 +243,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 raise WrappedException(e)
 
     app.add_exception_handler(StarletteHTTPException, _exception_handler)
-    if conf.get('operator') is not None:
-       app.add_middleware(SetOperatorMiddleware)
+    app.add_middleware(SetOperatorMiddleware)
     app.add_middleware(HandleCorsHeadersMiddleware)
     for record in API(graph).records:
         fastapi_url = sub(r':([^/]+)', '{\\1}', record.url)
