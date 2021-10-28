@@ -3,6 +3,7 @@ from typing import Any, Optional, Callable, TYPE_CHECKING
 from re import sub
 from os import getcwd, path
 from traceback import extract_tb, print_exception
+from jsonclasses.pkgutils import check_and_install_packages
 from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import ObjectNotFoundException
 from jsonclasses.orm_object import ORMObject
@@ -15,22 +16,13 @@ if TYPE_CHECKING:
     from flask import Flask, Blueprint, Response
 
 
+def check_flask_installed() -> None:
+    packages = {'flask': ('flask', '>=2.0.0,<3.0.0')}
+    check_and_install_packages(packages)
+
+
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
-
-
-def _ensure_operator():
-    from flask import g
-    from werkzeug.exceptions import Unauthorized
-    if g.operator is None:
-        raise Unauthorized('sign in required')
-
-
-def _encode_jwt_token(operator: ORMObject) -> str:
-    from flask import current_app
-    from jwt import encode
-    key = current_app.config['jsonclasses_encode_key']
-    return encode({'operator': operator._id}, key, algorithm='HS256')
 
 
 def _handle_cors_options(cors: dict[str, str]) -> Callable[[], Optional[Response]]:
@@ -115,15 +107,8 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
             }), code
 
 
-def _try_import_flask():
-    try:
-        from flask import Flask
-    except ModuleNotFoundError:
-        raise 'please install flask in order to use create_flask_server'
-
-
 def create_flask_server(graph: str = 'default') -> Flask:
-    _try_import_flask()
+    check_flask_installed()
     from flask import request, g, jsonify, make_response, Flask, Blueprint
     app = Flask('app')
     app.url_map.strict_slashes = False

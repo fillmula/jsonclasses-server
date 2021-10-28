@@ -7,26 +7,23 @@ from traceback import extract_tb, print_exception
 from jsonclasses.user_conf import user_conf
 from .excs import AuthenticationException
 from jsonclasses.excs import ObjectNotFoundException
+from jsonclasses.pkgutils import check_and_install_packages
 from .decode_jwt_token import decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
 
 
+def check_fastapi_installed() -> None:
+    packages = {'fastapi': ('fastapi', '>=0.66.0,<0.70.0')}
+    check_and_install_packages(packages)
 
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
 
-def _try_import_fastapi():
-    try:
-        from fastapi import FastAPI
-    except ModuleNotFoundError:
-        raise 'please install fastapi in order to use create_fastapi_server'
-
-
 def create_fastapi_server(graph: str = 'default') -> Any:
-    _try_import_fastapi()
+    check_fastapi_installed()
     from fastapi import FastAPI, Request, Response
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
