@@ -6,7 +6,7 @@ from .api_object import APIObject
 from .aconf import AConf
 from .api_record import APIRecord
 from .actx import ACtx
-from .encode_jwt_token import encode_jwt_token
+from .jwt_token import encode_jwt_token
 from .nameutils import (
     cname_to_pname, cname_to_srname, fname_to_pname, pname_to_cname,
     pname_to_fname
