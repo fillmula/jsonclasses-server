@@ -15,7 +15,7 @@ class TestFlaskServer(ClientTestCase):
         collection = Connection.get_collection(Article)
         collection.delete_many({})
 
-    def test_create_creates_a_song(self, client):
+    def test_flask_creates_a_song(self, client):
         rv = client.post('/songs', json={"name": "song", "year": 2021}).data
         result = loads(rv)["data"]
         self.assertIsNotNone(result["id"])
@@ -23,7 +23,7 @@ class TestFlaskServer(ClientTestCase):
         self.assertIsNotNone(result["updatedAt"])
         self.assertEqual(["song", 2021], [result["name"], result["year"]])
 
-    def test_get_gets_all_songs(self, client):
+    def test_flask_gets_all_songs(self, client):
         client.post('/songs', json={"name": "song", "year": 2021})
         client.post('/songs', json={"name": "song2", "year": 2019})
         rv = client.get('/songs').data
@@ -37,7 +37,7 @@ class TestFlaskServer(ClientTestCase):
         self.assertIsNotNone(result[1]["updatedAt"])
         self.assertEqual(["song2", 2019], [result[1]["name"], result[1]["year"]])
 
-    def test_get_gets_a_songs(self, client):
+    def test_flask_gets_a_songs(self, client):
         song = client.post('/songs', json={"name": "song", "year": 2021}).data
         client.post('/songs', json={"name": "song2", "year": 2019})
         song_id = loads(song)["data"]["id"]
@@ -48,7 +48,7 @@ class TestFlaskServer(ClientTestCase):
         self.assertIsNotNone(result["updatedAt"])
         self.assertEqual(["song", 2021], [result["name"], result["year"]])
 
-    def test_update_updates_a_song(self, client):
+    def test_flask_updates_a_song(self, client):
         song = client.post('/songs', json={"name": "song", "year": 2021}).data
         client.post('/songs', json={"name": "song2", "year": 2019})
         song_id = loads(song)["data"]["id"]
@@ -59,7 +59,7 @@ class TestFlaskServer(ClientTestCase):
         self.assertIsNotNone(result["updatedAt"])
         self.assertEqual(["some on you loved", 2016], [result["name"], result["year"]])
 
-    def test_delete_deletes_a_song(self, client):
+    def test_flask_deletes_a_song(self, client):
         song = client.post('/songs', json={"name": "song", "year": 2021}).data
         client.post('/songs', json={"name": "song2", "year": 2019})
         client.post('/songs', json={"name": "song3", "year": 2017})
@@ -68,3 +68,31 @@ class TestFlaskServer(ClientTestCase):
         songs = client.get('/songs').data
         self.assertStatus(rv, 204)
         self.assertEqual(len(loads(songs)["data"]), 2)
+
+    def test_flask_sign_in(self, client):
+        client.post('/users', json={"username": "Jack", "password": "12345678"})
+        rv = client.post('/users/session', json={"username": "Jack", "password": "12345678"}).data
+        result = loads(rv)["data"]
+        self.assertIsNotNone(result["token"])
+
+    def test_flask_sign_in_to_create_article(self, client):
+        user = client.post('/users', json={"username": "Jack", "password": "12345678"}).data
+        rv = client.post('/users/session', json={"username": "Jack", "password": "12345678"}).data
+        token = loads(rv)["data"]["token"]
+        auther_id = loads(user)["data"]["id"]
+        article_rv = client.post('/articles',
+                              json={"title": "Python", "content": "How to learn python"},
+                              headers={"Authorization": f"Bearer {token}"}).data
+        article = loads(article_rv)["data"]
+        self.assertIsNotNone(article["id"])
+        self.assertIsNotNone(article["createdAt"])
+        self.assertIsNotNone(article["updatedAt"])
+        self.assertEqual([
+            "Python",
+            "How to learn python",
+            auther_id
+        ], [
+            article["title"],
+            article["content"],
+            article["authorId"]
+        ])
