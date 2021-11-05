@@ -54,5 +54,6 @@ class Song:
     created_at: datetime = types.readonly.datetime.tscreated.required
     updated_at: datetime = types.readonly.datetime.tsupdated.required
 
+
 flask_app = create_flask_server()
 fastapi_app = create_fastapi_server()
