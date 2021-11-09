@@ -116,12 +116,18 @@ class API:
     def record_l(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def l(actx: ACtx) -> Tuple[int, Any]:
             result = cls.find(actx.qs).exec()
-            return (200, result)
+            filtered = []
+            for item in result:
+                try:
+                    filtered.append(item.opby(actx.operator).tojson())
+                except Exception as e:
+                    continue
+            return (200, filtered)
         self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
 
     def record_r(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def r(actx: ACtx) -> Tuple[int, Any]:
-            result = cls.id(actx.id, actx.qs).exec()
+            result = cls.id(actx.id, actx.qs).exec().opby(actx.operator)
             return (200, result)
         self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
 
