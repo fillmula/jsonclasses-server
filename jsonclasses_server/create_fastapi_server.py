@@ -1,26 +1,23 @@
-from typing import Any, Optional
+from typing import Any
 from re import sub
-from os import getcwd, path
 from json import dumps
 from jsonclasses.json_encoder import JSONEncoder
-from traceback import extract_tb, print_exception
 from jsonclasses.user_conf import user_conf
-from .excs import AuthenticationException
-from jsonclasses.excs import ObjectNotFoundException
+from jsonclasses.excs import (
+    ObjectNotFoundException, ValidationException, UniqueConstraintException,
+    UnauthorizedActionException
+)
 from jsonclasses.pkgutils import check_and_install_packages
 from .jwt_token import check_jwt_installed, decode_jwt_token
 from .api_class import API
 from .actx import ACtx
 from .api_record import APIRecord
+from .excs import AuthenticationException
 
 
 def check_fastapi_installed() -> None:
     packages = {'fastapi': ('fastapi', '>=0.70.0,<0.71.0')}
     check_and_install_packages(packages)
-
-
-def _remove_none(obj: dict) -> dict:
-    return {k: v for k, v in obj.items() if v is not None}
 
 
 def create_fastapi_server(graph: str = 'default') -> Any:
@@ -33,117 +30,41 @@ def create_fastapi_server(graph: str = 'default') -> Any:
     conf = user_conf()
     cors = conf.get('cors') or {}
 
-    def _exception_handler(request: Request, exception: Exception) -> Response:
-        if app.debug == True:
-            if isinstance(exception, WrappedException):
-                exc = exception.exc
-                if exception.status_code == 500:
-                    print_exception(type[exc], value=exc, tb=exc.__traceback__)
-                    message = {
-                        'error': _remove_none({
-                            'type': 'Internal Server Error',
-                            'message': 'There is an internal server error.',
-                            'error_type': exception.__class__.__name__,
-                            'error_message': str(exception),
-                            'fields': (exception.keypath_messages
-                                    if (isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException))
-                                    else None),
-                            'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
-                                })
-                    }
-                    return JSONResponse(content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
-                else:
-                    message = {
-                        'error': _remove_none({
-                            'type': exc.__class__.__name__,
-                            'message': str(exc),
-                            'fields': (exc.keypath_messages
-                                    if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
-                                    else None),
-                            'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
-                        })
-                    }
-                    return JSONResponse(content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
-            else:
-                print_exception(type[exception], value=exception, tb=exception.__traceback__)
-                message = {
-                    'error': _remove_none({
-                        'type': exception.__class__.__name__,
-                        'message': exception.detail,
-                        'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
-                    })
-                }
-                return JSONResponse(
-                    content=dumps(message, cls=JSONEncoder).encode('utf-8'),
-                    status_code=exception.status_code)
-        else:
-            if isinstance(exception, WrappedException):
-                exc = exception.exc
-                if exception.status_code == 500:
-                    print_exception(type[exc], value=exc, tb=exc.__traceback__)
-                    message = {
-                        'error': _remove_none({
-                            'type': 'Internal Server Error',
-                            'message': 'There is an internal server error.'
-                        })
-                    }
-                    print("HERE1 message", message)
-                    return JSONResponse(
-                        content=dumps(message, cls=JSONEncoder).encode('utf-8'),
-                        status_code=exception.status_code)
-                else:
-                    message = {
-                        'error': _remove_none({
-                            'type': exc.__class__.__name__,
-                            'message': str(exc),
-                            'fields': (exc.keypath_messages
-                                    if (isinstance(exc, ValidationException) or isinstance(exc, UniqueConstraintException))
-                                    else None)
-                        })
-                    }
-                    print("HERE2 message", message)
-                    return JSONResponse(
-                        content=dumps(message, cls=JSONEncoder).encode('utf-8'),
-                        status_code=exception.status_code)
-            else:
-                print_exception(type[exception], value=exception, tb=exception.__traceback__)
-                message = {
-                    'error': _remove_none({
-                        'type': exception.__class__.__name__,
-                        'message': exception.detail
-                    })
-                }
-                return JSONResponse(
-                    content=dumps(message, cls=JSONEncoder).encode('utf-8'),
-                    status_code=exception.status_code)
+    def error(code: int, type: str, msg: str):
+        return JSONResponse(content={
+            'error': {
+                'type': type,
+                'message': msg
+            }
+        }, status_code=code)
 
-    from jsonclasses.excs import (ValidationException,
-                                  UniqueConstraintException,
-                                  UnauthorizedActionException)
-
-    class WrappedException(StarletteHTTPException):
-        def __init__(self, exc: Exception) -> None:
-            from fastapi import HTTPException
-            code = exc.status_code if isinstance(exc, HTTPException) else 500
-            code = 404 if isinstance(exc, ObjectNotFoundException) else code
-            code = 400 if isinstance(exc, ValidationException) else code
-            code = 400 if isinstance(exc, UniqueConstraintException) else code
-            code = 401 if isinstance(exc, UnauthorizedActionException) else code
-            code = 400 if isinstance(exc, AuthenticationException) else code
-            super().__init__(status_code=code, detail=str(exc))
-            self.exc = exc
-
-    async def omni_catch_middleware(request: Request, call_next):
-        try:
-            return await call_next(request)
-        except Exception:
-            # you probably want some kind of logging here
-            return JSONResponse(content={
-                "error": {
-                    "type": "Works",
-                    "message": "OK"
-                }
-            }, status_code=500)
+    def jcerror(exception: Exception) -> Response:
+        from fastapi.exceptions import HTTPException
+        code = exception.status_code if isinstance(exception, HTTPException) else 500
+        code = 404 if isinstance(exception, ObjectNotFoundException) else code
+        code = 400 if isinstance(exception, ValidationException) else code
+        code = 400 if isinstance(exception, UniqueConstraintException) else code
+        code = 401 if isinstance(exception, UnauthorizedActionException) else code
+        code = 400 if isinstance(exception, AuthenticationException) else code
+        if code == 500:
+            return JSONResponse(
+                content={
+                    'error': {
+                        'type': 'Internal Server Error',
+                        'message': 'There is an internal server error.'
+                    }
+                },
+                status_code=500
+            )
+        message = {
+            'error': {
+                'type': exception.__class__.__name__,
+                'message': str(exception)
+            }
+        }
+        if isinstance(exception, ValidationException) or isinstance(exception, UniqueConstraintException):
+            message['error']['fields'] = exception.keypath_messages
+        return JSONResponse(status_code=code, content=message)
 
     async def set_operator_middleware(request, call_next):
         check_jwt_installed()
@@ -151,19 +72,17 @@ def create_fastapi_server(graph: str = 'default') -> Any:
         from jwt import DecodeError
         if 'authorization' not in request.headers:
             request.state.operator = None
-            response = await call_next(request)
-            return response
+            return await call_next(request)
         authorization = request.headers['authorization']
         token = authorization[7:]
         try:
             decoded = decode_jwt_token(token, graph)
         except DecodeError:
-            raise WrappedException(HTTPException(401, 'authorization token is invalid'))
+            return error(401, 'Unauthorized', 'authorization token is invalid')
         except ObjectNotFoundException:
-            raise WrappedException(HTTPException(401, 'user is not authorized'))
+            return error(401, 'Unauthorized', 'user is not authorized')
         request.state.operator = decoded
-        response = await call_next(request)
-        return response
+        return await call_next(request)
 
     async def handle_cors_headers_middleware(request, call_next):
         if request.method == 'OPTIONS':
@@ -188,7 +107,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = lcallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_r(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -200,7 +119,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = rcallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_c(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -214,7 +133,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = ccallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_u(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -228,7 +147,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = ucallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_d(record: APIRecord, app: 'FastAPI', url: str) -> None:
         dcallback = record.callback
@@ -238,7 +157,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             try:
                 dcallback(ctx)
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_s(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -250,7 +169,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = scallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     def _install_e(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -262,7 +181,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                 [_, result] = ecallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
             except Exception as e:
-                raise WrappedException(e)
+                return jcerror(e)
 
     app.middleware('http')(set_operator_middleware)
     app.middleware('http')(handle_cors_headers_middleware)
@@ -282,5 +201,4 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
-    app.middleware('http')(omni_catch_middleware)
     return app
