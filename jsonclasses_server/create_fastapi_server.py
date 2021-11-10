@@ -18,6 +18,7 @@ def check_fastapi_installed() -> None:
     packages = {'fastapi': ('fastapi', '>=0.70.0,<0.71.0')}
     check_and_install_packages(packages)
 
+
 def _remove_none(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
@@ -25,13 +26,14 @@ def _remove_none(obj: dict) -> dict:
 def create_fastapi_server(graph: str = 'default') -> Any:
     check_fastapi_installed()
     from fastapi import FastAPI, Request, Response
+    from fastapi.responses import JSONResponse
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     app = FastAPI()
     conf = user_conf()
     cors = conf.get('cors') or {}
 
-    def _exception_handler(request: Request, exception: StarletteHTTPException) -> Response:
+    def _exception_handler(request: Request, exception: Exception) -> Response:
         if app.debug == True:
             if isinstance(exception, WrappedException):
                 exc = exception.exc
@@ -49,7 +51,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                             'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                                 })
                     }
-                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                    return JSONResponse(content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
                 else:
                     message = {
                         'error': _remove_none({
@@ -61,7 +63,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                             'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                         })
                     }
-                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                    return JSONResponse(content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
             else:
                 print_exception(type[exception], value=exception, tb=exception.__traceback__)
                 message = {
@@ -71,7 +73,9 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                         'traceback': [f'file {path.relpath(f.filename, getcwd())}:{f.lineno} in {f.name}' for f in extract_tb(exception.__traceback__)],  # noqa: E501
                     })
                 }
-                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                return JSONResponse(
+                    content=dumps(message, cls=JSONEncoder).encode('utf-8'),
+                    status_code=exception.status_code)
         else:
             if isinstance(exception, WrappedException):
                 exc = exception.exc
@@ -83,7 +87,10 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                             'message': 'There is an internal server error.'
                         })
                     }
-                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                    print("HERE1 message", message)
+                    return JSONResponse(
+                        content=dumps(message, cls=JSONEncoder).encode('utf-8'),
+                        status_code=exception.status_code)
                 else:
                     message = {
                         'error': _remove_none({
@@ -94,7 +101,10 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                                     else None)
                         })
                     }
-                    return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                    print("HERE2 message", message)
+                    return JSONResponse(
+                        content=dumps(message, cls=JSONEncoder).encode('utf-8'),
+                        status_code=exception.status_code)
             else:
                 print_exception(type[exception], value=exception, tb=exception.__traceback__)
                 message = {
@@ -103,15 +113,18 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                         'message': exception.detail
                     })
                 }
-                return Response(media_type="application/json", content=dumps(message, cls=JSONEncoder).encode('utf-8'), status_code=exception.status_code)
+                return JSONResponse(
+                    content=dumps(message, cls=JSONEncoder).encode('utf-8'),
+                    status_code=exception.status_code)
 
     from jsonclasses.excs import (ValidationException,
                                   UniqueConstraintException,
                                   UnauthorizedActionException)
+
     class WrappedException(StarletteHTTPException):
         def __init__(self, exc: Exception) -> None:
             from fastapi import HTTPException
-            code = exc.code if isinstance(exc, HTTPException) else 500
+            code = exc.status_code if isinstance(exc, HTTPException) else 500
             code = 404 if isinstance(exc, ObjectNotFoundException) else code
             code = 400 if isinstance(exc, ValidationException) else code
             code = 400 if isinstance(exc, UniqueConstraintException) else code
@@ -120,41 +133,50 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             super().__init__(status_code=code, detail=str(exc))
             self.exc = exc
 
-    from starlette.middleware.base import BaseHTTPMiddleware
-    class SetOperatorMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next):
-            check_jwt_installed()
-            from werkzeug.exceptions import Unauthorized
-            from jwt import DecodeError
-            if 'authorization' not in request.headers:
-                request.state.operator = None
-                response = await call_next(request)
-                return response
-            authorization = request.headers['authorization']
-            token = authorization[7:]
-            try:
-                decoded = decode_jwt_token(token, graph)
-            except DecodeError:
-                raise Unauthorized('authorization token is invalid')
-            except ObjectNotFoundException:
-                raise Unauthorized('user is not authorized')
-            request.state.operator = decoded
+    async def omni_catch_middleware(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception:
+            # you probably want some kind of logging here
+            return JSONResponse(content={
+                "error": {
+                    "type": "Works",
+                    "message": "OK"
+                }
+            }, status_code=500)
+
+    async def set_operator_middleware(request, call_next):
+        check_jwt_installed()
+        from fastapi.exceptions import HTTPException
+        from jwt import DecodeError
+        if 'authorization' not in request.headers:
+            request.state.operator = None
             response = await call_next(request)
             return response
+        authorization = request.headers['authorization']
+        token = authorization[7:]
+        try:
+            decoded = decode_jwt_token(token, graph)
+        except DecodeError:
+            raise WrappedException(HTTPException(401, 'authorization token is invalid'))
+        except ObjectNotFoundException:
+            raise WrappedException(HTTPException(401, 'user is not authorized'))
+        request.state.operator = decoded
+        response = await call_next(request)
+        return response
 
-    class HandleCorsHeadersMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next):
-            if request.method == 'OPTIONS':
-                return Response(status_code=204, headers={
-                    'Access-Control-Allow-Origin': cors.get('allowOrigin') or '*',
-                    'Access-Control-Allow-Methods': cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE',
-                    'Access-Control-Allow-Headers': cors.get('allowHeaders') or '*',
-                    'Access-Control-Max-Age': cors.get('maxAge') or '86400'
-                })
-            else:
-                res = await call_next(request)
-                res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
-                return res
+    async def handle_cors_headers_middleware(request, call_next):
+        if request.method == 'OPTIONS':
+            return Response(status_code=204, headers={
+                'Access-Control-Allow-Origin': cors.get('allowOrigin') or '*',
+                'Access-Control-Allow-Methods': cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE',
+                'Access-Control-Allow-Headers': cors.get('allowHeaders') or '*',
+                'Access-Control-Max-Age': cors.get('maxAge') or '86400'
+            })
+        else:
+            res = await call_next(request)
+            res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
+            return res
 
     def _install_l(record: APIRecord, app: 'FastAPI', url: str) -> None:
         from fastapi import Request
@@ -242,9 +264,8 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             except Exception as e:
                 raise WrappedException(e)
 
-    app.add_exception_handler(StarletteHTTPException, _exception_handler)
-    app.add_middleware(SetOperatorMiddleware)
-    app.add_middleware(HandleCorsHeadersMiddleware)
+    app.middleware('http')(set_operator_middleware)
+    app.middleware('http')(handle_cors_headers_middleware)
     for record in API(graph).records:
         fastapi_url = sub(r':([^/]+)', '{\\1}', record.url)
         if record.kind == 'L':
@@ -261,4 +282,5 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
+    app.middleware('http')(omni_catch_middleware)
     return app

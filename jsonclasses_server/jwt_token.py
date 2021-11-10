@@ -11,7 +11,7 @@ default_operator_conf = {
 }
 
 def check_jwt_installed() -> None:
-    packages = {'pyjwt': ('pyjwt', '>=2.1.0,<3.0.0')}
+    packages = {'jwt': ('pyjwt', '>=2.1.0,<3.0.0')}
     check_and_install_packages(packages)
 
 
