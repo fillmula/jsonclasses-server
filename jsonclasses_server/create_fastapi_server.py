@@ -195,7 +195,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
         rcallback = record.callback
         @app.get(url)
         def read_by_id(id: Any, request: Request):
-            ctx = ACtx(id=id, qs=request.scope.get("query_string", bytes()).decode("utf-8"))
+            ctx = ACtx(id=id, qs=request.scope.get("query_string", bytes()).decode("utf-8"), operator=request.state.operator)
             try:
                 [_, result] = rcallback(ctx)
                 return Response(media_type="application/json", content=dumps(result, cls=JSONEncoder).encode('utf-8'))
@@ -221,7 +221,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
         ucallback = record.callback
         @app.patch(url)
         async def update(id: Any, request: Request):
-            ctx = ACtx(id=id, body=(await request.json()),
+            ctx = ACtx(id=id, body=(await request.form() or await request.json()),
                        qs=request.scope.get("query_string", bytes()).decode("utf-8"),
                        operator=request.state.operator)
             try:
@@ -233,8 +233,8 @@ def create_fastapi_server(graph: str = 'default') -> Any:
     def _install_d(record: APIRecord, app: 'FastAPI', url: str) -> None:
         dcallback = record.callback
         @app.delete(url, status_code=204)
-        def delete(id: Any) -> None:
-            ctx = ACtx(id=id)
+        def delete(id: Any, request: Request) -> None:
+            ctx = ACtx(id=id, operator=request.state.operator)
             try:
                 dcallback(ctx)
             except Exception as e:
