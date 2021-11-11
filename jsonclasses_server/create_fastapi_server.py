@@ -1,6 +1,8 @@
 from typing import Any
 from re import sub
 from json import dumps
+from os import getcwd
+from pathlib import Path
 from jsonclasses.json_encoder import JSONEncoder
 from jsonclasses.user_conf import user_conf
 from jsonclasses.excs import (
@@ -201,5 +203,9 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
-    app.mount("/public", StaticFiles(directory="public", html=False), name="public")
+    if 'uploaders' in user_conf():
+        for _, v in user_conf()['uploaders']:
+            if v['client'] == 'localfs':
+                Path(getcwd() / 'public').mkdir()
+                app.mount("/public", StaticFiles(directory="public", html=False), name="public")
     return app
