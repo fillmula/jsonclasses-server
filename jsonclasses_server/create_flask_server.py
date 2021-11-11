@@ -47,7 +47,7 @@ def _add_cors_headers(cors: dict[str, str]) -> Callable[[Response], Response]:
 
 
 def _exception_handler(exception: Exception) -> tuple[Response, int]:
-    from flask import Response, jsonify, current_app
+    from flask import Response, jsonify, current_app, send_from_directory
     from werkzeug.exceptions import HTTPException
     from jsonclasses.excs import (ObjectNotFoundException,
                                   ValidationException,
@@ -108,8 +108,8 @@ def _exception_handler(exception: Exception) -> tuple[Response, int]:
 
 def create_flask_server(graph: str = 'default') -> Flask:
     check_flask_installed()
-    from flask import request, g, jsonify, make_response, Flask, Blueprint
-    app = Flask('app')
+    from flask import Flask, Blueprint
+    app = Flask('app', static_folder='public')
     app.url_map.strict_slashes = False
     from flask.json import JSONEncoder as FlaskJSONEncoder
     class JSJSONEncoder(FlaskJSONEncoder):
