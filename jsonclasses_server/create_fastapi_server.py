@@ -204,8 +204,8 @@ def create_fastapi_server(graph: str = 'default') -> Any:
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
     if 'uploaders' in user_conf():
-        for _, v in user_conf()['uploaders']:
+        for _, v in user_conf()['uploaders'].items():
             if v['client'] == 'localfs':
-                Path(getcwd() / 'public').mkdir()
+                (Path(getcwd()) / 'public').mkdir()
                 app.mount("/public", StaticFiles(directory="public", html=False), name="public")
     return app
