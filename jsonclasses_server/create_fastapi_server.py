@@ -23,8 +23,8 @@ def check_fastapi_installed() -> None:
 def create_fastapi_server(graph: str = 'default') -> Any:
     check_fastapi_installed()
     from fastapi import FastAPI, Request, Response
+    from fastapi.staticfiles import StaticFiles
     from fastapi.responses import JSONResponse
-    from starlette.exceptions import HTTPException as StarletteHTTPException
 
     app = FastAPI()
     conf = user_conf()
@@ -201,4 +201,5 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
+    app.mount("/public", StaticFiles(directory="public", html=False), name="public")
     return app
