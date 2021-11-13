@@ -36,6 +36,7 @@ def authorized(
                              'JSONClass class.')
         cls = cast(type[APIObject], cls)
         auth_conf = AuthConf(expires_in=expires_in)
+        cls.auth_conf = auth_conf
         API(cls.cdef.jconf.cgraph.name).record_auth(cls, auth_conf)
         return cls
     else:

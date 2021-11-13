@@ -51,6 +51,7 @@ class API:
 
     def record_auth(self: API, cls: type[APIObject], auth_conf: AuthConf) -> None:
         aconf = cls.aconf
+        auth_conf: AuthConf = cls.auth_conf
         basename = aconf.name or aconf.cname_to_pname(cls.__name__)
         name = f'/{basename}/session'
         ai_fields = cls.cdef._auth_identity_fields
@@ -61,6 +62,8 @@ class API:
         ab_names = [f.name for f in ab_fields]
         ab_json_names = [f.json_name for f in ab_fields]
         ab_valid_names = set(ab_names + ab_json_names)
+        auth_conf.info._identities = ai_names
+        auth_conf.info._bys = ab_names
         def auth(actx: ACtx) -> Tuple[int, Any]:
             body = cast(dict[str, Any], actx.body)
             ai_set = set(body.keys()).intersection(ai_valid_names)
