@@ -14,6 +14,7 @@ class AuthInfo:
     def __init__(self) -> None:
         self._identities: list[str] = []
         self._bys: list[str] = []
+        self._srname: str = ''
 
     @property
     def identities(self) -> list[str]:
@@ -22,6 +23,10 @@ class AuthInfo:
     @property
     def bys(self) -> list[str]:
         return self._bys
+
+    @property
+    def srname(self) -> str:
+        return self._srname
 
 
 @final
@@ -41,5 +46,6 @@ class AuthConf:
     def expires_in(self: AuthConf) -> timedelta:
         return self._expires_in or timedelta(365)
 
+    @property
     def info(self: AuthConf) -> AuthInfo:
         return self._info

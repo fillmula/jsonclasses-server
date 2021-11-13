@@ -64,6 +64,8 @@ class API:
         ab_valid_names = set(ab_names + ab_json_names)
         auth_conf.info._identities = ai_names
         auth_conf.info._bys = ab_names
+        srname = aconf.cname_to_srname(cls.__name__)
+        auth_conf.info._srname = srname
         def auth(actx: ACtx) -> Tuple[int, Any]:
             body = cast(dict[str, Any], actx.body)
             ai_set = set(body.keys()).intersection(ai_valid_names)
@@ -93,7 +95,7 @@ class API:
             ctx = Ctx.rootctxp(obj, ab_name, newval, ab_value)
             checker.modifier.validate(ctx)
             token = encode_jwt_token(obj, auth_conf.expires_in)
-            srname = aconf.cname_to_srname(cls.__name__)
+            srname = auth_conf.info.srname
             obj.opby(obj)
             return (200, {'token': token, srname: obj})
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
