@@ -1,11 +1,12 @@
 from unittest.case import TestCase
 from fastapi.testclient import TestClient
 from jsonclasses_pymongo.connection import Connection
-from json import loads
 from .servers.server import fastapi_app, User, Article, Song
+
 
 app = fastapi_app
 client = TestClient(app)
+
 
 class TestFastapiServer(TestCase):
 
@@ -18,7 +19,7 @@ class TestFastapiServer(TestCase):
         collection.delete_many({})
 
     def test_fastapi_creates_a_song(self):
-        result = client.post('/songs', json={"name": "song", "year": 2021}).json()
+        result = client.post('/songs', json={"name": "song", "year": 2021}).json()['data']
         self.assertIsNotNone(result["data"]["id"])
         self.assertIsNotNone(result["data"]["createdAt"])
         self.assertIsNotNone(result["data"]["updatedAt"])
@@ -27,7 +28,7 @@ class TestFastapiServer(TestCase):
     def test_fastapi_gets_all_songs(self):
         client.post('/songs', json={"name": "song", "year": 2021})
         client.post('/songs', json={"name": "song2", "year": 2019})
-        result = client.get('/songs').json()
+        result = client.get('/songs').json()['data']
         self.assertIsNotNone(result[0]["id"])
         self.assertIsNotNone(result[0]["createdAt"])
         self.assertIsNotNone(result[0]["updatedAt"])
@@ -38,20 +39,20 @@ class TestFastapiServer(TestCase):
         self.assertEqual(["song2", 2019], [result[1]["name"], result[1]["year"]])
 
     def test_fastapi_gets_a_songs(self):
-        song = client.post('/songs', json={"name": "song", "year": 2021}).json()
+        song = client.post('/songs', json={"name": "song", "year": 2021}).json()['data']
         client.post('/songs', json={"name": "song2", "year": 2019})
         song_id = song["id"]
-        result = client.get(f'/songs/{song_id}').json()
+        result = client.get(f'/songs/{song_id}').json()['data']
         self.assertIsNotNone(result["id"])
         self.assertIsNotNone(result["createdAt"])
         self.assertIsNotNone(result["updatedAt"])
         self.assertEqual(["song", 2021], [result["name"], result["year"]])
 
     def test_fastapi_updates_a_song(self):
-        song = client.post('/songs', json={"name": "song", "year": 2021}).json()
+        song = client.post('/songs', json={"name": "song", "year": 2021}).json()["data"]
         client.post('/songs', json={"name": "song2", "year": 2019})
         song_id = song["id"]
-        result = client.patch(f'/songs/{song_id}', json={"name": "some on you loved", "year": 2016}).json()
+        result = client.patch(f'/songs/{song_id}', json={"name": "some on you loved", "year": 2016}).json()["data"]
         self.assertIsNotNone(result["id"])
         self.assertIsNotNone(result["createdAt"])
         self.assertIsNotNone(result["updatedAt"])
