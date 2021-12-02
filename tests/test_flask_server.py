@@ -1,5 +1,5 @@
 from flask_unittest import ClientTestCase
-from jsonclasses_pymongo import Connection
+from jsonclasses_pymongo.connection import Connection
 from json import loads
 from .servers.server import flask_app, fastapi_app, User, Article, Song
 

@@ -1,6 +1,6 @@
 from unittest.case import TestCase
 from fastapi.testclient import TestClient
-from jsonclasses_pymongo import Connection
+from jsonclasses_pymongo.connection import Connection
 from json import loads
 from .servers.server import fastapi_app, User, Article, Song
 
@@ -19,9 +19,9 @@ class TestFastapiServer(TestCase):
 
     def test_fastapi_creates_a_song(self):
         result = client.post('/songs', json={"name": "song", "year": 2021}).json()
-        self.assertIsNotNone(result["id"])
-        self.assertIsNotNone(result["createdAt"])
-        self.assertIsNotNone(result["updatedAt"])
+        self.assertIsNotNone(result["data"]["id"])
+        self.assertIsNotNone(result["data"]["createdAt"])
+        self.assertIsNotNone(result["data"]["updatedAt"])
         self.assertEqual(["song", 2021], [result["name"], result["year"]])
 
     def test_fastapi_gets_all_songs(self):
@@ -61,34 +61,34 @@ class TestFastapiServer(TestCase):
         song = client.post('/songs', json={"name": "song", "year": 2021}).json()
         client.post('/songs', json={"name": "song2", "year": 2019})
         client.post('/songs', json={"name": "song3", "year": 2017})
-        song_id = song["id"]
+        song_id = song["data"]["id"]
         result = client.delete(f'/songs/{song_id}')
         songs = client.get('/songs').json()
         self.assertEqual(result.status_code, 204)
-        self.assertEqual(len(songs), 2)
+        self.assertEqual(len(songs["data"]), 2)
 
     def test_fastapi_sign_in(self):
         client.post('/users', json={"username": "Jack", "password": "12345678"})
         result = client.post('/users/session', json={"username": "Jack", "password": "12345678"}).json()
-        self.assertIsNotNone(result["token"])
+        self.assertIsNotNone(result["data"]["token"])
 
     def test_fastapi_sign_in_to_create_article(self):
         user = client.post('/users', json={"username": "Jack", "password": "12345678"}).json()
         sign_in = client.post('/users/session', json={"username": "Jack", "password": "12345678"}).json()
-        token = sign_in["token"]
-        auther_id = user["id"]
+        token = sign_in["data"]["token"]
+        auther_id = user["data"]["id"]
         article = client.post('/articles',
                               json={"title": "Python", "content": "How to learn python"},
                               headers={"Authorization": f"Bearer {token}"}).json()
-        self.assertIsNotNone(article["id"])
-        self.assertIsNotNone(article["createdAt"])
-        self.assertIsNotNone(article["updatedAt"])
+        self.assertIsNotNone(article["data"]["id"])
+        self.assertIsNotNone(article["data"]["createdAt"])
+        self.assertIsNotNone(article["data"]["updatedAt"])
         self.assertEqual([
             "Python",
             "How to learn python",
             auther_id
         ], [
-            article["title"],
-            article["content"],
-            article["authorId"]
+            article["data"]["title"],
+            article["data"]["content"],
+            article["data"]["authorId"]
         ])

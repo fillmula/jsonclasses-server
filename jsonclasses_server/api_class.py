@@ -84,8 +84,8 @@ class API:
             u_ab_name = ab_set.pop()
             ai_value = body[u_ai_name]
             ab_value = body[u_ab_name]
-            ai_name = cls.cdef.jconf.key_decoding_strategy(u_ai_name)
-            ab_name = cls.cdef.jconf.key_decoding_strategy(u_ab_name)
+            ai_name = cls.cdef.jconf.input_key_strategy(u_ai_name)
+            ab_name = cls.cdef.jconf.input_key_strategy(u_ab_name)
             obj = cls.one(**{ai_name: ai_value}).optional.exec()
             if obj is None:
                 raise AuthenticationException('authorizable unit not found')

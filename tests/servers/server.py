@@ -4,7 +4,8 @@ from enum import Enum
 from typing import Optional
 from dotenv import load_dotenv
 from jsonclasses import jsonclass, jsonenum, types
-from jsonclasses_pymongo import pymongo, Connection
+from jsonclasses_pymongo import pymongo
+from jsonclasses_pymongo.connection import Connection
 from jsonclasses_server import api, authorized, create_flask_server, create_fastapi_server
 
 
