@@ -4,7 +4,7 @@ from re import sub
 from os import getcwd, path
 from traceback import extract_tb, print_exception
 from jsonclasses.pkgutils import check_and_install_packages
-from jsonclasses.user_conf import user_conf
+from jsonclasses.uconf import uconf
 from jsonclasses.excs import ObjectNotFoundException
 from .jwt_token import check_jwt_installed, decode_jwt_token
 from .api_class import API
@@ -118,7 +118,7 @@ def create_flask_server(graph: str = 'default') -> Flask:
                 return o.tojson()
             return super().default(o)
     app.json_encoder = JSJSONEncoder
-    conf = user_conf()
+    conf = uconf()
     app.register_error_handler(Exception, _exception_handler)
     app.before_request(_handle_cors_options(conf.get('cors') or {}))
     app.after_request(_add_cors_headers(conf.get('cors') or {}))
