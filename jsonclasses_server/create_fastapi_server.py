@@ -3,8 +3,8 @@ from re import sub
 from json import dumps
 from os import getcwd
 from pathlib import Path
-from jsonclasses.json_encoder import JSONEncoder
-from jsonclasses.user_conf import user_conf
+from jsonclasses.encoder import JSONEncoder
+from jsonclasses.uconf import uconf
 from jsonclasses.excs import (
     ObjectNotFoundException, ValidationException, UniqueConstraintException,
     UnauthorizedActionException
@@ -29,7 +29,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
     from fastapi.responses import JSONResponse
 
     app = FastAPI()
-    conf = user_conf()
+    conf = uconf()
     cors = conf.get('cors') or {}
 
     def error(code: int, type: str, msg: str):
@@ -203,8 +203,8 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             _install_d(record, app, fastapi_url)
         elif record.kind == 'S':
             _install_s(record, app, fastapi_url)
-    if 'uploaders' in user_conf():
-        for _, v in user_conf()['uploaders'].items():
+    if 'uploaders' in uconf():
+        for _, v in uconf()['uploaders'].items():
             if v['client'] == 'localfs':
                 (Path(getcwd()) / 'public').mkdir()
                 app.mount("/public", StaticFiles(directory="public", html=False), name="public")
