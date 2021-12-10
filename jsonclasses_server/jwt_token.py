@@ -19,7 +19,7 @@ def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:
     check_jwt_installed()
     from jwt import decode
     operator_conf = uconf().get('operator') or default_operator_conf
-    secret_key = operator_conf.get('secretKey')
+    secret_key = operator_conf.get('secret_key')
     decoded = decode(token, secret_key, algorithms=['HS256'])
     id = decoded['id']
     class_name = decoded['class']
@@ -33,7 +33,7 @@ def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:
     check_jwt_installed()
     from jwt import encode
     operator_conf = uconf().get('operator') or default_operator_conf
-    secret_key = operator_conf.get('secretKey')
+    secret_key = operator_conf.get('secret_key')
     data = {
         'class': operator.__class__.__name__,
         'id': operator._id,
