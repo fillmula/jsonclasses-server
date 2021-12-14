@@ -97,7 +97,7 @@ class API:
             token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = auth_conf.info.srname
             obj.opby(obj)
-            return (200, {'token': token, srname: obj})
+            return (200, {'token': token, srname: obj.tojson()})
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
 
     def record(self: API, cls: type[APIObject], aconf: AConf) -> None:
@@ -133,19 +133,19 @@ class API:
     def record_r(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def r(actx: ACtx) -> Tuple[int, Any]:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator)
-            return (200, result)
+            return (200, result.tojson())
         self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
 
     def record_c(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def c(actx: ACtx) -> Tuple[int, Any]:
             result = cls(**(actx.body or {})).opby(actx.operator).save()
-            return (200, result)
+            return (200, result.tojson())
         self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
 
     def record_u(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
         def u(actx: ACtx) -> Tuple[int, Any]:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator).set(**(actx.body or {})).save()
-            return (200, result)
+            return (200, result.tojson())
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
     def record_d(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
@@ -173,7 +173,7 @@ class API:
                 result.opby(actx.operator).set(**updater).save()
             else:
                 result = cls(**actx.body).opby(actx.operator).save()
-            return (200, result)
+            return (200, result.tojson())
         self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
 
     @property

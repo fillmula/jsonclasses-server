@@ -73,11 +73,12 @@ def create_server(graph: str = 'default') -> Any:
             except DecodeError:
                 content = _error_content('Unauthorized', 'authorization token is invalid')
                 ctx.res.code = 401
+                ctx.res.json(content)
             except ObjectNotFoundException:
                 content = _error_content('Unauthorized', 'user is not authorized')
                 ctx.res.code = 401
+                ctx.res.json(content)
             ctx.state.operator = decoded
-            ctx.res.json(content)
             await next(ctx)
 
 
@@ -96,7 +97,7 @@ def create_server(graph: str = 'default') -> Any:
             id = ctx.req.args.get('id')
             actx = ACtx(id=id, qs=ctx.req.qs, operator=ctx.state.operator)
             [_, result] = rcallback(actx)
-            ctx.res.json({"data": result.tojson()})
+            ctx.res.json({"data": result})
 
     def _install_c(record: APIRecord, url: str) -> None:
         ccallback = record.callback
@@ -106,7 +107,7 @@ def create_server(graph: str = 'default') -> Any:
                     qs=ctx.req.qs,
                     operator=ctx.state.operator)
             [_, result] = ccallback(actx)
-            ctx.res.json({"data": result.tojson()})
+            ctx.res.json({"data": result})
 
 
     def _install_u(record: APIRecord, url: str) -> None:
@@ -118,12 +119,12 @@ def create_server(graph: str = 'default') -> Any:
                     qs=ctx.req.qs,
                     operator=ctx.state.operator)
             [_, result] = ucallback(actx)
-            ctx.res.json({"data": result.tojson()})
+            ctx.res.json({"data": result})
 
     def _install_d(record: APIRecord, url: str) -> None:
         dcallback = record.callback
         @delete(url)
-        def delete_i(ctx: Ctx) -> None:
+        def delete_by_id(ctx: Ctx) -> None:
             id = ctx.req.args.get('id')
             actx = ACtx(id=id, operator=ctx.state.operator)
             ctx.res.code = 204
@@ -135,7 +136,7 @@ def create_server(graph: str = 'default') -> Any:
         async def create_session(ctx: Ctx):
             actx = ACtx(body=(await ctx.req.dict()))
             [_, result] = scallback(actx)
-            ctx.res.json({"data": result.tojson()})
+            ctx.res.json({"data": result})
 
     def _install_e(record: APIRecord, url: str) -> None:
         ecallback = record.callback
@@ -143,7 +144,7 @@ def create_server(graph: str = 'default') -> Any:
         async def ensure(ctx: Ctx):
             actx = ACtx(body=(await ctx.req.dict()))
             [_, result] = ecallback(actx)
-            ctx.res.json({"data": result.tojson()})
+            ctx.res.json({"data": result})
 
 
     for record in API(graph).records:
