@@ -78,7 +78,7 @@ def create_server(graph: str = 'default') -> Any:
                 ctx.res.code = 401
             ctx.state.operator = decoded
             ctx.res.json(content)
-            return await next(ctx)
+            await next(ctx)
 
 
     def _install_l(record: APIRecord, url: str) -> None:
@@ -87,7 +87,7 @@ def create_server(graph: str = 'default') -> Any:
             lcallback = record.callback
             actx = ACtx(qs=ctx.req.qs, operator=ctx.state.operator)
             [_, result] = lcallback(actx)
-            ctx.res.json({"data": [r.tojson() for r in result]})
+            ctx.res.json({"data": [r for r in result]})
 
     def _install_r(record: APIRecord, url: str) -> None:
         rcallback = record.callback
