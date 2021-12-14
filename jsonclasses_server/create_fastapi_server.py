@@ -1,9 +1,7 @@
 from typing import Any
 from re import sub
-from json import dumps
 from os import getcwd
 from pathlib import Path
-from jsonclasses.encoder import JSONEncoder
 from jsonclasses.uconf import uconf
 from jsonclasses.excs import (
     ObjectNotFoundException, ValidationException, UniqueConstraintException,
@@ -107,7 +105,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             ctx = ACtx(qs=request.scope.get("query_string", bytes()).decode("utf-8"), operator=request.state.operator)
             try:
                 [_, result] = lcallback(ctx)
-                return JSONResponse(content={"data": [r.tojson() for r in result]})
+                return JSONResponse(content={"data": [r for r in result]})
             except Exception as e:
                 return jcerror(e)
 
@@ -119,7 +117,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             ctx = ACtx(id=id, qs=request.scope.get("query_string", bytes()).decode("utf-8"), operator=request.state.operator)
             try:
                 [_, result] = rcallback(ctx)
-                return JSONResponse(content={"data": result.tojson()})
+                return JSONResponse(content={"data": result})
             except Exception as e:
                 return jcerror(e)
 
@@ -133,7 +131,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                     operator=request.state.operator)
             try:
                 [_, result] = ccallback(ctx)
-                return JSONResponse(content={"data": result.tojson()})
+                return JSONResponse(content={"data": result})
             except Exception as e:
                 return jcerror(e)
 
@@ -147,7 +145,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
                        operator=request.state.operator)
             try:
                 [_, result] = ucallback(ctx)
-                return JSONResponse(content={"data": result.tojson()})
+                return JSONResponse(content={"data": result})
             except Exception as e:
                 return jcerror(e)
 
@@ -169,7 +167,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             ctx = ACtx(body=(await request.form() or await request.json()))
             try:
                 [_, result] = scallback(ctx)
-                return Response(media_type="application/json", content=dumps({"data": result}, cls=JSONEncoder).encode('utf-8'))
+                return JSONResponse(content={"data": result})
             except Exception as e:
                 return jcerror(e)
 
@@ -181,7 +179,7 @@ def create_fastapi_server(graph: str = 'default') -> Any:
             ctx = ACtx(body=(await request.form() or await request.json()))
             try:
                 [_, result] = ecallback(ctx)
-                return JSONResponse(content={"data": result.tojson()})
+                return JSONResponse(content={"data": result})
             except Exception as e:
                 return jcerror(e)
 
