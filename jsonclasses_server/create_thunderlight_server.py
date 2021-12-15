@@ -45,7 +45,7 @@ def create_thunderlight_server(graph: str = 'default') -> Any:
             ctx.res.json(content)
 
     @use
-    async def handle_cors_headers_middleware(ctx: Ctx, _: Next) -> None:
+    async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
         res = ctx.res
         if ctx.req.method == 'OPTIONS': # handle cors options
             res.code = 204
@@ -56,6 +56,8 @@ def create_thunderlight_server(graph: str = 'default') -> Any:
                 'Access-Control-Max-Age': cors.get('maxAge') or '86400'
             }
             res.empty()
+            return
+        await next(ctx)
 
     @use
     async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
