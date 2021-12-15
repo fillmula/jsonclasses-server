@@ -14,7 +14,9 @@ from .jwt_token import check_jwt_installed, decode_jwt_token
 
 
 def create_server(graph: str = 'default') -> Any:
+
     cors = uconf().get('cors') or {}
+
     def _error_content(type: str, msg: str) -> dict[str, str]:
         return {
             'error': {
@@ -43,7 +45,7 @@ def create_server(graph: str = 'default') -> Any:
             ctx.res.json(content)
 
     @use
-    async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
+    async def handle_cors_headers_middleware(ctx: Ctx, _: Next) -> None:
         res = ctx.res
         if ctx.req.method == 'OPTIONS': # handle cors options
             res.code = 204
@@ -53,9 +55,7 @@ def create_server(graph: str = 'default') -> Any:
                 'Access-Control-Allow-Headers': cors.get('allowHeaders') or '*',
                 'Access-Control-Max-Age': cors.get('maxAge') or '86400'
             }
-        await next(ctx)
-        res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*' # add cors headers
-
+            res.empty()
 
     @use
     async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
@@ -69,7 +69,8 @@ def create_server(graph: str = 'default') -> Any:
             authorization = req.headers['authorization']
             token = authorization[7:]
             try:
-                decoded = decode_jwt_token(token)
+                decoded = decode_jwt_token(token, graph)
+                ctx.state.operator = decoded
             except DecodeError:
                 content = _error_content('Unauthorized', 'authorization token is invalid')
                 ctx.res.code = 401
@@ -78,7 +79,6 @@ def create_server(graph: str = 'default') -> Any:
                 content = _error_content('Unauthorized', 'user is not authorized')
                 ctx.res.code = 401
                 ctx.res.json(content)
-            ctx.state.operator = decoded
             await next(ctx)
 
 
@@ -108,7 +108,6 @@ def create_server(graph: str = 'default') -> Any:
                     operator=ctx.state.operator)
             [_, result] = ccallback(actx)
             ctx.res.json({"data": result})
-
 
     def _install_u(record: APIRecord, url: str) -> None:
         ucallback = record.callback
