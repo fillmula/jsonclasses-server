@@ -13,7 +13,7 @@ from .excs import AuthenticationException
 from .jwt_token import check_jwt_installed, decode_jwt_token
 
 
-def create_server(graph: str = 'default') -> Any:
+def create_thunderlight_server(graph: str = 'default') -> Any:
 
     cors = uconf().get('cors') or {}
 
