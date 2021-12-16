@@ -66,7 +66,7 @@ class API:
         auth_conf.info._bys = ab_names
         srname = aconf.cname_to_srname(cls.__name__)
         auth_conf.info._srname = srname
-        def auth(actx: ACtx) -> Tuple[int, Any]:
+        def auth(actx: ACtx) -> Any:
             body = cast(dict[str, Any], actx.body)
             ai_set = set(body.keys()).intersection(ai_valid_names)
             len_ai_set = len(ai_set)
@@ -97,7 +97,7 @@ class API:
             token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = auth_conf.info.srname
             obj.opby(obj)
-            return (200, {'token': token, srname: obj.tojson()})
+            return {'token': token, srname: obj.tojson()}
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
 
     def record(self: API, cls: type[APIObject], aconf: AConf) -> None:
@@ -119,7 +119,7 @@ class API:
             self.record_d(cls, aconf, name, gname, sname)
 
     def record_l(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
-        def l(actx: ACtx) -> Tuple[int, Any]:
+        def l(actx: ACtx) -> Any:
             result = cls.find(actx.qs).exec()
             filtered = []
             for item in result:
@@ -127,35 +127,35 @@ class API:
                     filtered.append(item.opby(actx.operator).tojson())
                 except Exception as e:
                     continue
-            return (200, filtered)
+            return filtered
         self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
 
     def record_r(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
-        def r(actx: ACtx) -> Tuple[int, Any]:
+        def r(actx: ACtx) -> Any:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator)
-            return (200, result.tojson())
+            return result.tojson()
         self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
 
     def record_c(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
-        def c(actx: ACtx) -> Tuple[int, Any]:
+        def c(actx: ACtx) -> Any:
             result = cls(**(actx.body or {})).opby(actx.operator).save()
-            return (200, result.tojson())
+            return result.tojson()
         self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
 
     def record_u(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
-        def u(actx: ACtx) -> Tuple[int, Any]:
+        def u(actx: ACtx) -> Any:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator).set(**(actx.body or {})).save()
-            return (200, result.tojson())
+            return result.tojson()
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
     def record_d(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
-        def d(actx: ACtx) -> Tuple[int, Any]:
+        def d(actx: ACtx) -> Any:
             cls.id(actx.id).exec().opby(actx.operator).delete()
-            return (204, None)
+            return None
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
 
     def record_e(self: API, cls: type[APIObject], name: str, ename: str) -> None:
-        def e(actx: ACtx) -> tuple[int, Any]:
+        def e(actx: ACtx) -> Any:
             ufields = cls.cdef._unique_fields
             unames = [f.name for f in ufields]
             ujsonnames = [f.json_name for f in ufields]
@@ -173,7 +173,7 @@ class API:
                 result.opby(actx.operator).set(**updater).save()
             else:
                 result = cls(**actx.body).opby(actx.operator).save()
-            return (200, result.tojson())
+            return result.tojson()
         self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
 
     @property
