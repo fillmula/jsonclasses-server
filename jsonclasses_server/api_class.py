@@ -106,19 +106,19 @@ class API:
         sname = f'{gname}/:id'
         ename = f'{gname}/ensure'
         if 'L' in aconf.actions:
-            self.record_l(cls, aconf, name, gname, sname)
+            self.record_l(cls, name, gname)
         if 'E' in aconf.actions:
             self.record_e(cls, name, ename)
         if 'R' in aconf.actions:
-            self.record_r(cls, aconf, name, gname, sname)
+            self.record_r(cls, name, sname)
         if 'C' in aconf.actions:
-            self.record_c(cls, aconf, name, gname, sname)
+            self.record_c(cls, name, gname)
         if 'U' in aconf.actions:
-            self.record_u(cls, aconf, name, gname, sname)
+            self.record_u(cls, name, sname)
         if 'D' in aconf.actions:
-            self.record_d(cls, aconf, name, gname, sname)
+            self.record_d(cls, name, sname)
 
-    def record_l(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+    def record_l(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def l(actx: ACtx) -> Any:
             result = cls.find(actx.qs).exec()
             filtered = []
@@ -130,25 +130,25 @@ class API:
             return filtered
         self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
 
-    def record_r(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+    def record_r(self: API, cls: type[APIObject], name: str, sname: str) -> None:
         def r(actx: ACtx) -> Any:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator)
             return result.tojson()
         self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
 
-    def record_c(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+    def record_c(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def c(actx: ACtx) -> Any:
             result = cls(**(actx.body or {})).opby(actx.operator).save()
             return result.tojson()
         self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
 
-    def record_u(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+    def record_u(self: API, cls: type[APIObject], name: str, sname: str) -> None:
         def u(actx: ACtx) -> Any:
             result = cls.id(actx.id, actx.qs).exec().opby(actx.operator).set(**(actx.body or {})).save()
             return result.tojson()
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
-    def record_d(self: API, cls: type[APIObject], aconf: AConf, name: str, gname: str, sname: str) -> None:
+    def record_d(self: API, cls: type[APIObject], name: str, sname: str) -> None:
         def d(actx: ACtx) -> Any:
             cls.id(actx.id).exec().opby(actx.operator).delete()
             return None
