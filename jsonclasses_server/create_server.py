@@ -134,8 +134,8 @@ def server(graph: str = 'default') -> App:
         scallback = record.callback
         @post(url)
         async def create_session(ctx: Ctx):
-            actx = ACtx(body=(await ctx.req.dict()))
-            [_, result] = scallback(actx)
+            actx = ACtx(body=(await ctx.req.dict()), qs=ctx.req.qs)
+            result = scallback(actx)
             ctx.res.json({"data": result})
 
     def _install_e(record: APIRecord, url: str) -> None:
