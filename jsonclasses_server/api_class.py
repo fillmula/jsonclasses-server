@@ -96,8 +96,11 @@ class API:
             checker.modifier.validate(ctx)
             token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = auth_conf.info.srname
-            obj.opby(obj)
-            return {'token': token, srname: obj.tojson()}
+            json_obj = obj.opby(obj).tojson()
+            if actx.qs != '':
+                qs = f'{ai_name}={ai_value}&{actx.qs}'
+                json_obj = cls.one(qs).exec().opby(obj).tojson()
+            return {'token': token, srname: json_obj}
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
 
     def record(self: API, cls: type[APIObject], aconf: AConf) -> None:
