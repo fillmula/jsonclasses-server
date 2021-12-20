@@ -105,8 +105,8 @@ def server(graph: str = 'default') -> App:
         @post(url)
         async def create(ctx: Ctx):
             actx = ACtx(body=(await ctx.req.dict()),
-                    qs=ctx.req.qs,
-                    operator=ctx.state.operator)
+                        qs=ctx.req.qs,
+                        operator=ctx.state.operator)
             result = ccallback(actx)
             ctx.res.json({"data": result})
 
@@ -116,8 +116,8 @@ def server(graph: str = 'default') -> App:
         async def update(ctx: Ctx):
             id = ctx.req.args.get('id')
             actx = ACtx(id=id, body=(await ctx.req.dict()),
-                    qs=ctx.req.qs,
-                    operator=ctx.state.operator)
+                        qs=ctx.req.qs,
+                        operator=ctx.state.operator)
             result = ucallback(actx)
             ctx.res.json({"data": result})
 

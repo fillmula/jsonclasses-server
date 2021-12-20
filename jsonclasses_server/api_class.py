@@ -98,8 +98,7 @@ class API:
             srname = auth_conf.info.srname
             json_obj = obj.opby(obj).tojson()
             if actx.qs != '':
-                qs = f'{ai_name}={ai_value}&{actx.qs}'
-                json_obj = cls.one(qs).exec().opby(obj).tojson()
+                json_obj = cls.id(obj._id, actx.qs).exec().opby(obj).tojson()
             return {'token': token, srname: json_obj}
         self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
 
@@ -142,6 +141,8 @@ class API:
     def record_c(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def c(actx: ACtx) -> Any:
             result = cls(**(actx.body or {})).opby(actx.operator).save()
+            if actx.qs != '':
+                result = cls.id(result._id, actx.qs).exec().opby(result)
             return result.tojson()
         self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
 
