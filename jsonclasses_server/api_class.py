@@ -1,7 +1,9 @@
 from __future__ import annotations
 from jsonclasses_server.auth_conf import AuthConf
 from typing import ClassVar, Tuple, Any, cast
+from qsparser import stringify
 from jsonclasses.ctx import Ctx
+from jsonclasses.excs import UniqueConstraintException
 from .api_object import APIObject
 from .aconf import AConf
 from .api_record import APIRecord
@@ -140,6 +142,23 @@ class API:
 
     def record_c(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def c(actx: ACtx) -> Any:
+            resource = actx.body
+            upsert_query = resource.get('_upsert')
+            if upsert_query is not None:
+                qs = stringify(upsert_query) if actx.qs == '' else f'{stringify(upsert_query)}&{actx.qs}'
+                input_data = resource.get('_data') or resource.get('_create') or resource.get('_update')
+                if input_data is not None:
+                    try:
+                        result = cls(**(input_data)).opby(actx.operator).save()
+                    except UniqueConstraintException as e:
+                        if resource.get('_create') is not None:
+                            raise e
+                        unique_key = [*e.keypath_messages][0]
+                        result = cls.one(f'{unique_key}={input_data.get(unique_key)}') \
+                        .exec().opby(actx.operator).set(**(input_data or {})).save()
+                    if qs != '':
+                        result = cls.id(result._id, qs).exec().opby(result)
+                    return result.tojson()
             result = cls(**(actx.body or {})).opby(actx.operator).save()
             if actx.qs != '':
                 result = cls.id(result._id, actx.qs).exec().opby(result)
