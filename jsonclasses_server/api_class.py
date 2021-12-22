@@ -119,8 +119,10 @@ class API:
             self.record_c(cls, name, gname)
         if 'U' in aconf.actions:
             self.record_u(cls, name, sname)
+            self.record_um(cls, name, gname)
         if 'D' in aconf.actions:
             self.record_d(cls, name, sname)
+            self.record_dm(cls, name, gname)
 
     def record_l(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def l(actx: ACtx) -> Any:
@@ -183,11 +185,35 @@ class API:
             return result.tojson()
         self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
 
+    def record_um(self: API, cls: type[APIObject], name: str, gname: str) -> None:
+        def um(actx: ACtx) -> Any:
+            update = actx.body['_update']
+            uq = stringify(update['_query'])
+            qs = uq if actx.qs == '' else f'{uq}&{actx.qs}'
+            result = cls.find(qs).exec()
+            updated = []
+            for item in result:
+                updated.append(item.opby(actx.operator).set(**(update['_data'] or {})).save().tojson())
+            return updated
+        self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', gname, um))
+
     def record_d(self: API, cls: type[APIObject], name: str, sname: str) -> None:
         def d(actx: ACtx) -> Any:
             cls.id(actx.id).exec().opby(actx.operator).delete()
             return None
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
+
+    def record_dm(self: API, cls: type[APIObject], name: str, gname: str) -> None:
+        def d(actx: ACtx) -> Any:
+            update = actx.body['_delete']
+            uq = stringify(update['_query'])
+            qs = uq if actx.qs == '' else f'{uq}&{actx.qs}'
+            result = cls.find(qs).exec()
+            for item in result:
+                item.opby(actx.operator).delete()
+            return None
+        self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', gname, d))
+
 
     def record_e(self: API, cls: type[APIObject], name: str, ename: str) -> None:
         def e(actx: ACtx) -> Any:
