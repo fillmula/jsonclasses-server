@@ -204,16 +204,15 @@ class API:
         self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
 
     def record_dm(self: API, cls: type[APIObject], name: str, gname: str) -> None:
-        def d(actx: ACtx) -> Any:
-            update = actx.body['_delete']
-            uq = stringify(update['_query'])
+        def dm(actx: ACtx) -> Any:
+            delete = actx.body['_delete']
+            uq = stringify(delete['_query'])
             qs = uq if actx.qs == '' else f'{uq}&{actx.qs}'
             result = cls.find(qs).exec()
             for item in result:
                 item.opby(actx.operator).delete()
             return None
-        self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', gname, d))
-
+        self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', gname, dm))
 
     def record_e(self: API, cls: type[APIObject], name: str, ename: str) -> None:
         def e(actx: ACtx) -> Any:
