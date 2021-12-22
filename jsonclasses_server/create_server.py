@@ -124,9 +124,9 @@ def server(graph: str = 'default') -> App:
     def _install_d(record: APIRecord, url: str) -> None:
         dcallback = record.callback
         @delete(url)
-        def delete_by_id(ctx: Ctx) -> None:
+        def delete_by_id_or_query(ctx: Ctx) -> None:
             id = ctx.req.args.get('id')
-            actx = ACtx(id=id, operator=ctx.state.operator)
+            actx = ACtx(id=id, operator=ctx.state.operator, qs=ctx.req.qs)
             ctx.res.code = 204
             dcallback(actx)
 
