@@ -2,16 +2,11 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from dotenv import load_dotenv
 from jsonclasses import jsonclass, jsonenum, types
 from jsonclasses_pymongo import pymongo
-from jsonclasses_pymongo.connection import Connection
-from jsonclasses_server import api, authorized, create_flask_server, create_fastapi_server
+from jsonclasses_server import api, authorized, create_server
 
 
-Connection.default.set_url('mongodb://localhost:27017/blogserverdb')
-
-load_dotenv()
 
 @jsonenum
 class Sex(Enum):
@@ -56,5 +51,4 @@ class Song:
     updated_at: datetime = types.readonly.datetime.tsupdated.required
 
 
-flask_app = create_flask_server()
-fastapi_app = create_fastapi_server()
+app = create_server()
