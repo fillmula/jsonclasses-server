@@ -205,10 +205,7 @@ class API:
 
     def record_dm(self: API, cls: type[APIObject], name: str, gname: str) -> None:
         def dm(actx: ACtx) -> Any:
-            delete = actx.body['_delete']
-            uq = stringify(delete['_query'])
-            qs = uq if actx.qs == '' else f'{uq}&{actx.qs}'
-            result = cls.find(qs).exec()
+            result = cls.find(actx.qs).exec()
             for item in result:
                 item.opby(actx.operator).delete()
             return None

@@ -1,7 +1,7 @@
 from unittest.case import TestCase
 from jsonclasses_pymongo.connection import Connection
 from thunderlight.client import Client
-from .servers.server import app, User, Article, Song
+from .classes.server import app, User, Article, Song
 
 
 client = Client(app)
