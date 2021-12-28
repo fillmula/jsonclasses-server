@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import Union, Callable, Optional, overload, cast
 from datetime import timedelta
 from jsonclasses.isjsonclass import isjsonclass
-from .aconf import AConf
 from .api_object import APIObject
 from .auth_conf import AuthConf
 
