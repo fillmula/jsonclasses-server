@@ -2,12 +2,10 @@ from __future__ import annotations
 from jsonclasses_server.auth_conf import AuthConf
 from typing import ClassVar, Any, cast
 from qsparser import stringify
-from jsonclasses.ctx import Ctx
-from jsonclasses.excs import UniqueConstraintException
+from jsonclasses.ctx import Ctx as JCtx
+from thunderlight import Ctx, get, post, patch, delete
 from .api_object import APIObject
 from .aconf import AConf
-from .api_record import APIRecord
-from .actx import ACtx
 from .jwt_token import encode_jwt_token
 from .nameutils import (
     cname_to_pname, cname_to_srname, fname_to_pname, pname_to_cname,
@@ -40,7 +38,6 @@ class API:
             pname_to_cname=pname_to_cname,
             pname_to_fname=pname_to_fname,
             cname_to_srname=cname_to_srname)
-        self._records: list[APIRecord] = []
         self.__class__._initialized_map[graph_name] = True
         return None
 
@@ -55,7 +52,7 @@ class API:
         aconf = cls.aconf
         auth_conf: AuthConf = cls.auth_conf
         basename = aconf.name or aconf.cname_to_pname(cls.__name__)
-        name = f'/{basename}/session'
+        url = f'/{basename}/session'
         ai_fields = cls.cdef._auth_identity_fields
         ai_names = [f.name for f in ai_fields]
         ai_json_names = [f.json_name for f in ai_fields]
@@ -68,8 +65,9 @@ class API:
         auth_conf.info._bys = ab_names
         srname = aconf.cname_to_srname(cls.__name__)
         auth_conf.info._srname = srname
-        def auth(actx: ACtx) -> Any:
-            body = cast(dict[str, Any], actx.body)
+        @post(url)
+        async def create_session(ctx: Ctx):
+            body = cast(dict[str, Any], await ctx.req.dict())
             ai_set = set(body.keys()).intersection(ai_valid_names)
             len_ai_set = len(ai_set)
             if len_ai_set < 1:
@@ -92,149 +90,155 @@ class API:
             if obj is None:
                 raise AuthenticationException('authorizable unit not found')
             checker = cls.cdef.field_named(ab_name).fdef.auth_by_checker
-            ctx = Ctx.rootctxp(obj, ab_name, getattr(obj, ab_name), ab_value)
-            newval = checker.modifier.transform(ctx)
-            ctx = Ctx.rootctxp(obj, ab_name, newval, ab_value)
-            checker.modifier.validate(ctx)
+            jctx = JCtx.rootctxp(obj, ab_name, getattr(obj, ab_name), ab_value)
+            newval = checker.modifier.transform(jctx)
+            jctx = JCtx.rootctxp(obj, ab_name, newval, ab_value)
+            checker.modifier.validate(jctx)
             token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = auth_conf.info.srname
             json_obj = obj.opby(obj).tojson()
-            if actx.qs != '':
-                json_obj = cls.id(obj._id, actx.qs).exec().opby(obj).tojson()
-            return {'token': token, srname: json_obj}
-        self._records.insert(0, APIRecord(f's_{name}', 'S', 'POST', name, auth))
+            if ctx.req.qs != '':
+                json_obj = cls.id(obj._id, ctx.req.qs).exec().opby(obj).tojson()
+            result = {'token': token, srname: json_obj}
+            ctx.res.json({"data": result})
 
     def record(self: API, cls: type[APIObject], aconf: AConf) -> None:
         name = aconf.name or aconf.cname_to_pname(cls.__name__)
-        gname = f'/{name}'
-        sname = f'{gname}/:id'
-        ename = f'{gname}/ensure'
+        url = f'/{name}'
+        id_url = f'{url}/:id'
+        e_url = f'{url}/ensure'
         if 'L' in aconf.actions:
-            self.record_l(cls, name, gname)
+            self.record_l(cls, url)
         if 'E' in aconf.actions:
-            self.record_e(cls, name, ename)
+            self.record_e(cls, e_url)
         if 'R' in aconf.actions:
-            self.record_r(cls, name, sname)
+            self.record_r(cls, id_url)
         if 'C' in aconf.actions:
-            self.record_c(cls, name, gname)
+            self.record_c(cls, url)
         if 'U' in aconf.actions:
-            self.record_u(cls, name, sname)
-            self.record_um(cls, name, gname)
+            self.record_u(cls, name, id_url)
+            self.record_um(cls, name, url)
         if 'D' in aconf.actions:
-            self.record_d(cls, name, sname)
-            self.record_dm(cls, name, gname)
+            self.record_d(cls, name, id_url)
+            self.record_dm(cls, name, url)
 
-    def record_l(self: API, cls: type[APIObject], name: str, gname: str) -> None:
-        def l(actx: ACtx) -> Any:
-            result = cls.find(actx.qs).exec()
+    def record_l(self: API, cls: type[APIObject], url: str) -> None:
+        @get(url)
+        async def list_all(ctx: Ctx):
+            result = cls.find(ctx.req.qs).exec()
             filtered = []
             for item in result:
                 try:
-                    filtered.append(item.opby(actx.operator).tojson())
+                    filtered.append(item.opby(ctx.state.operator).tojson())
                 except Exception as e:
                     continue
-            return filtered
-        self._records.append(APIRecord(f'l_{name}', 'L', 'GET', gname, l))
+            ctx.res.json({ 'data': filtered })
 
-    def record_r(self: API, cls: type[APIObject], name: str, sname: str) -> None:
-        def r(actx: ACtx) -> Any:
-            result = cls.id(actx.id, actx.qs).exec().opby(actx.operator)
-            return result.tojson()
-        self._records.append(APIRecord(f'r_{name}', 'R', 'GET', sname, r))
+    def record_r(self: API, cls: type[APIObject], url: str) -> None:
+        @get(url)
+        async def read_by_id(ctx: Ctx):
+            id = ctx.req.args.get('id')
+            result = cls.id(id, ctx.req.qs).exec().opby(ctx.state.operator)
+            ctx.res.json({'data': result.tojson()})
 
-    def record_c(self: API, cls: type[APIObject], name: str, gname: str) -> None:
-        def c(actx: ACtx) -> Any:
-            resource = actx.body
+    def record_c(self: API, cls: type[APIObject], url: str) -> None:
+        @post(url)
+        async def create(ctx: Ctx):
+            resource = await ctx.req.dict()
+            url_qs = ctx.req.qs
             upsert: dict[str, Any] = resource.get('_upsert')
             create = resource.get('_create')
-            if upsert is not None:
+            if upsert and create is None:
                 query = stringify(upsert.get('_query'))
-                qs = query if actx.qs == '' else f'{query}&{actx.qs}'
+                qs = query if url_qs == '' else f'{query}&{url_qs}'
                 input_data = upsert.get('_data')
                 if input_data is not None:
                     result = cls.one(qs).optional.exec()
                     if result:
-                        result.opby(actx.operator).set(**input_data).save()
+                        result.opby(ctx.state.operator).set(**input_data).save()
                     else:
-                        result = cls(**input_data).opby(actx.operator).save()
-                    return result.tojson()
-            else:
+                        result = cls(**input_data).opby(ctx.state.operator).save()
+                    ctx.res.json({"data": result.tojson()})
+            elif create and upsert is None:
                 if isinstance(create, list):
                     result: list[dict[str, Any]] = []
                     for i in create:
-                        i_result = cls(**(i or {})).opby(actx.operator).save()
-                        if actx.qs != '':
-                            i_result = cls.id(i_result._id, actx.qs).exec().opby(actx.operator)
+                        i_result = cls(**(i or {})).opby(ctx.state.operator).save()
+                        if url_qs != '':
+                            i_result = cls.id(i_result._id, url_qs).exec().opby(ctx.state.operator)
                         result.append(i_result.tojson())
-                    return result
+                    ctx.res.json({"data": result})
                 elif isinstance(create, dict):
                     data = create.get('_data')
-                    result = cls(**(data or {})).opby(actx.operator).save()
-                    if actx.qs != '':
-                        result = cls.id(result._id, actx.qs).exec().opby(actx.operator)
-                    return result.tojson()
-            result = cls(**(actx.body or {})).opby(actx.operator).save()
-            if actx.qs != '':
-                result = cls.id(result._id, actx.qs).exec().opby(actx.operator)
-            return result.tojson()
-        self._records.append(APIRecord(f'c_{name}', 'C', 'POST', gname, c))
+                    result = cls(**(data or {})).opby(ctx.state.operator).save()
+                    if url_qs != '':
+                        result = cls.id(result._id, url_qs).exec().opby(ctx.state.operator)
+                    ctx.res.json({"data": result.tojson()})
+            else:
+                result = cls(**(resource or {})).opby(ctx.state.operator).save()
+                if url_qs != '':
+                    result = cls.id(result._id, url_qs).exec().opby(ctx.state.operator)
+                ctx.res.json({"data": result.tojson()})
 
-    def record_u(self: API, cls: type[APIObject], name: str, sname: str) -> None:
-        def u(actx: ACtx) -> Any:
-            result = cls.id(actx.id, actx.qs).exec().opby(actx.operator).set(**(actx.body or {})).save()
-            return result.tojson()
-        self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', sname, u))
+    def record_u(self: API, cls: type[APIObject], url: str) -> None:
+        @patch(url)
+        async def update_one(ctx: Ctx):
+            id = ctx.req.args.get('id')
+            body = await ctx.req.dict()
+            result = cls.id(id, ctx.req.qs).exec().opby(ctx.state.operator).set(**(body or {})).save()
+            ctx.res.json({'data': result.tojson()})
 
-    def record_um(self: API, cls: type[APIObject], name: str, gname: str) -> None:
-        def um(actx: ACtx) -> Any:
-            update = actx.body['_update']
+
+    def record_um(self: API, cls: type[APIObject], url: str) -> None:
+        @patch(url)
+        async def update_many(ctx: Ctx):
+            resource = await ctx.req.dict()
+            update = resource.get('_update')
             uq = stringify(update['_query'])
-            qs = uq if actx.qs == '' else f'{uq}&{actx.qs}'
+            qs = uq if ctx.req.qs == '' else f'{uq}&{ctx.req.qs}'
             result = cls.find(qs).exec()
             updated = []
             for item in result:
-                updated.append(item.opby(actx.operator).set(**(update['_data'] or {})).save().tojson())
-            return updated
-        self._records.append(APIRecord(f'u_{name}', 'U', 'PATCH', gname, um))
+                updated.append(item.opby(ctx.state.operator).set(**(update['_data'] or {})).save().tojson())
+            ctx.res.json({'data': updated})
 
-    def record_d(self: API, cls: type[APIObject], name: str, sname: str) -> None:
-        def d(actx: ACtx) -> Any:
-            cls.id(actx.id).exec().opby(actx.operator).delete()
-            return None
-        self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', sname, d))
+    def record_d(self: API, cls: type[APIObject], url: str) -> None:
+        @delete(url)
+        async def delete_by_id(ctx: Ctx) -> None:
+            id = ctx.req.args.get('id')
+            cls.id(id).exec().opby(ctx.state.operator).delete()
+            ctx.res.empty()
 
-    def record_dm(self: API, cls: type[APIObject], name: str, gname: str) -> None:
-        def dm(actx: ACtx) -> Any:
-            result = cls.find(actx.qs).exec()
+    def record_dm(self: API, cls: type[APIObject], url: str) -> None:
+        @delete(url)
+        async def delete_by_id(ctx: Ctx) -> None:
+            result = cls.find(ctx.req.qs).exec()
             for item in result:
-                item.opby(actx.operator).delete()
-            return None
-        self._records.append(APIRecord(f'd_{name}', 'D', 'DELETE', gname, dm))
+                item.opby(ctx.state.operator).delete()
+            ctx.res.empty()
 
-    def record_e(self: API, cls: type[APIObject], name: str, ename: str) -> None:
-        def e(actx: ACtx) -> Any:
+    def record_e(self: API, cls: type[APIObject], url: str) -> None:
+        @post(url)
+        async def e(ctx: Ctx) -> Any:
+            body = await ctx.req.dict()
             ufields = cls.cdef._unique_fields
             unames = [f.name for f in ufields]
             ujsonnames = [f.json_name for f in ufields]
             uvalidnames = set(unames + ujsonnames)
             matcher: dict[str, Any] = {}
             updater: dict[str, Any] = {}
-            for k, v in actx.body.items():
+            for k, v in await body.items():
                 if k in uvalidnames:
-                    if actx.body[k] is not None:
+                    if body[k] is not None:
                         matcher[k] = v
                 else:
                     updater[k] = v
             result = cls.one(matcher).optional.exec()
             if result:
-                result.opby(actx.operator).set(**updater).save()
+                result.opby(ctx.state.operator).set(**updater).save()
             else:
-                result = cls(**actx.body).opby(actx.operator).save()
-            return result.tojson()
-        self._records.append(APIRecord(f'e_{name}', 'E', 'POST', ename, e))
+                result = cls(**body).opby(ctx.state.operator).save()
+            ctx.res.json({'data': result.tojson()})
 
-    @property
-    def records(self) -> list[APIRecord]:
-        return self._records
 
 API.default = API('default')
