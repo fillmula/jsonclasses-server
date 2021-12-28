@@ -1,14 +1,10 @@
 from __future__ import annotations
-from typing import Any
-from thunderlight import Ctx, Next,App, app, use, get, post, patch, delete
+from thunderlight import Ctx, Next,App, app, use
 from jsonclasses.uconf import uconf
 from jsonclasses.excs import (ObjectNotFoundException,
                               ValidationException,
                               UniqueConstraintException,
                               UnauthorizedActionException)
-from .actx import ACtx
-from .api_class import API
-from .api_record import APIRecord
 from .excs import AuthenticationException
 from .jwt_token import check_jwt_installed, decode_jwt_token
 
@@ -81,84 +77,5 @@ async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
         await next(ctx)
 
 
-def server(graph: str = 'default') -> App:
-
-    def _install_l(record: APIRecord, url: str) -> None:
-        @get(url)
-        async def list_all(ctx: Ctx):
-            lcallback = record.callback
-            actx = ACtx(qs=ctx.req.qs, operator=ctx.state.operator)
-            result = lcallback(actx)
-            ctx.res.json({"data": [r for r in result]})
-
-    def _install_r(record: APIRecord, url: str) -> None:
-        rcallback = record.callback
-        @get(url)
-        async def read_by_id(ctx: Ctx):
-            id = ctx.req.args.get('id')
-            actx = ACtx(id=id, qs=ctx.req.qs, operator=ctx.state.operator)
-            result = rcallback(actx)
-            ctx.res.json({"data": result})
-
-    def _install_c(record: APIRecord, url: str) -> None:
-        ccallback = record.callback
-        @post(url)
-        async def create(ctx: Ctx):
-            actx = ACtx(body=(await ctx.req.dict()),
-                        qs=ctx.req.qs,
-                        operator=ctx.state.operator)
-            result = ccallback(actx)
-            ctx.res.json({"data": result})
-
-    def _install_u(record: APIRecord, url: str) -> None:
-        ucallback = record.callback
-        @patch(url)
-        async def update(ctx: Ctx):
-            id = ctx.req.args.get('id')
-            actx = ACtx(id=id, body=(await ctx.req.dict()),
-                        qs=ctx.req.qs,
-                        operator=ctx.state.operator)
-            result = ucallback(actx)
-            ctx.res.json({"data": result})
-
-    def _install_d(record: APIRecord, url: str) -> None:
-        dcallback = record.callback
-        @delete(url)
-        async def delete_by_id_or_query(ctx: Ctx) -> None:
-            id = ctx.req.args.get('id')
-            actx = ACtx(id=id, operator=ctx.state.operator, qs=ctx.req.qs)
-            ctx.res.code = 204
-            dcallback(actx)
-
-    def _install_s(record: APIRecord, url: str) -> None:
-        scallback = record.callback
-        @post(url)
-        async def create_session(ctx: Ctx):
-            actx = ACtx(body=(await ctx.req.dict()), qs=ctx.req.qs)
-            result = scallback(actx)
-            ctx.res.json({"data": result})
-
-    def _install_e(record: APIRecord, url: str) -> None:
-        ecallback = record.callback
-        @post(url)
-        async def ensure(ctx: Ctx):
-            actx = ACtx(body=(await ctx.req.dict()))
-            result = ecallback(actx)
-            ctx.res.json({"data": result})
-
-    for record in API(graph).records:
-        if record.kind == 'L':
-            _install_l(record, record.url)
-        elif record.kind == 'E':
-            _install_e(record, record.url)
-        elif record.kind == 'R':
-            _install_r(record, record.url)
-        elif record.kind == 'C':
-            _install_c(record, record.url)
-        elif record.kind == 'U':
-            _install_u(record, record.url)
-        elif record.kind == 'D':
-            _install_d(record, record.url)
-        elif record.kind == 'S':
-            _install_s(record, record.url)
+def server() -> App:
     return app
