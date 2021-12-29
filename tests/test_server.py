@@ -7,7 +7,7 @@ from .classes.server import app, User, Article, Song
 client = Client(app)
 
 
-class TestFastapiServer(TestCase):
+class TestServer(TestCase):
 
     def setUp(self) -> None:
         collection = Connection.get_collection(Song)

@@ -116,11 +116,11 @@ class API:
         if 'C' in aconf.actions:
             self.record_c(cls, url)
         if 'U' in aconf.actions:
-            self.record_u(cls, name, id_url)
-            self.record_um(cls, name, url)
+            self.record_u(cls, id_url)
+            self.record_um(cls, url)
         if 'D' in aconf.actions:
-            self.record_d(cls, name, id_url)
-            self.record_dm(cls, name, url)
+            self.record_d(cls, id_url)
+            self.record_dm(cls, url)
 
     def record_l(self: API, cls: type[APIObject], url: str) -> None:
         @get(url)
