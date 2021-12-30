@@ -50,6 +50,7 @@ async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
         }
         res.empty()
         return
+    res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
     await next(ctx)
 
 @use
