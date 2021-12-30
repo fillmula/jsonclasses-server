@@ -1,4 +1,5 @@
 from __future__ import annotations
+from traceback import print_exception
 from thunderlight import Ctx, Next,App, app, use
 from jsonclasses.uconf import uconf
 from jsonclasses.excs import (ObjectNotFoundException,
@@ -22,6 +23,7 @@ async def error_handler(ctx: Ctx, next: Next) -> None:
     try:
         await next(ctx)
     except Exception as e:
+        print_exception(type[e], value=e, tb=e.__traceback__)
         code = 500
         code = 404 if isinstance(e, ObjectNotFoundException) else code
         code = 400 if isinstance(e, ValidationException) else code
