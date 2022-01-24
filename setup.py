@@ -23,5 +23,5 @@ setup(name='jsonclasses-server',
       python_requires='>=3.10',
       install_requires=[
           'qsparser>=1.0.1,<2.0.0',
-          'thunderlight>=0.1.0,<1.0.0'
+          'thunderlight>=0.2.5,<0.3.0'
       ])

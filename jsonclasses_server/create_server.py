@@ -44,12 +44,10 @@ async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
     cors = uconf().get('cors') or {}
     if ctx.req.method == 'OPTIONS': # handle cors options
         res.code = 204
-        res.headers = {
-            'Access-Control-Allow-Origin': cors.get('allowOrigin') or '*',
-            'Access-Control-Allow-Methods': cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE',
-            'Access-Control-Allow-Headers': cors.get('allowHeaders') or '*',
-            'Access-Control-Max-Age': cors.get('maxAge') or '86400'
-        }
+        res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
+        res.headers['Access-Control-Allow-Methods'] = cors.get('allowMethods') or 'OPTIONS, POST, GET, PATCH, DELETE'
+        res.headers['Access-Control-Allow-Headers'] = cors.get('allowHeaders') or '*'
+        res.headers['Access-Control-Max-Age'] = cors.get('maxAge') or '86400'
         res.empty()
         return
     res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
