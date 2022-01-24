@@ -1,6 +1,6 @@
 from __future__ import annotations
 from traceback import print_exception
-from thunderlight import Ctx, Next,App, app, use
+from thunderlight import Ctx, Next,App, gimme, use
 from jsonclasses.uconf import uconf
 from jsonclasses.excs import (ObjectNotFoundException,
                               ValidationException,
@@ -79,4 +79,4 @@ async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
 
 
 def server() -> App:
-    return app
+    return gimme()
