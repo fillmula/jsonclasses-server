@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 from jsonclasses import jsonclass, jsonenum, types
 from jsonclasses_pymongo import pymongo
-from jsonclasses_server import api, authorized, create_server
+from jsonclasses_server import api, authorized, server
 
 
 
@@ -51,4 +51,4 @@ class Song:
     updated_at: datetime = types.readonly.datetime.tsupdated.required
 
 
-app = create_server()
+app = server()
