@@ -24,7 +24,6 @@ async def error_handler(ctx: Ctx, next: Next) -> None:
     try:
         await next(ctx)
     except Exception as e:
-        print("entered catch in error handler")
         print_exception(type[e], value=e, tb=e.__traceback__)
         code = 500
         code = 404 if isinstance(e, ObjectNotFoundException) else code

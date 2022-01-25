@@ -125,7 +125,6 @@ class API:
     def record_l(self: API, cls: type[APIObject], url: str) -> None:
         @get(url)
         async def list_all(ctx: Ctx):
-            print("will find all")
             result = cls.find(ctx.req.query).exec()
             filtered = []
             for item in result:
@@ -133,7 +132,6 @@ class API:
                     filtered.append(item.opby(ctx.state.operator).tojson())
                 except Exception as e:
                     continue
-            print("will return data")
             ctx.res.json({ 'data': filtered })
 
     def record_r(self: API, cls: type[APIObject], url: str) -> None:
