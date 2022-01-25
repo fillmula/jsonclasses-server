@@ -7,7 +7,8 @@ from jsonclasses.excs import (ObjectNotFoundException,
                               UniqueConstraintException,
                               UnauthorizedActionException)
 from .excs import AuthenticationException
-from .jwt_token import check_jwt_installed, decode_jwt_token
+from .jwt_token import decode_jwt_token
+from jwt import DecodeError
 
 
 def _error_content(type: str, msg: str) -> dict[str, str]:
@@ -23,6 +24,7 @@ async def error_handler(ctx: Ctx, next: Next) -> None:
     try:
         await next(ctx)
     except Exception as e:
+        print("entered catch in error handler")
         print_exception(type[e], value=e, tb=e.__traceback__)
         code = 500
         code = 404 if isinstance(e, ObjectNotFoundException) else code
@@ -37,6 +39,7 @@ async def error_handler(ctx: Ctx, next: Next) -> None:
             content['error']['fields'] = e.keypath_messages
         ctx.res.code = code
         ctx.res.json(content)
+
 
 @use
 async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
@@ -53,16 +56,14 @@ async def handle_cors_headers_middleware(ctx: Ctx, next: Next) -> None:
     res.headers['Access-Control-Allow-Origin'] = cors.get('allowOrigin') or '*'
     await next(ctx)
 
+
 @use
 async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
-    check_jwt_installed()
-    from jwt import DecodeError
-    req = ctx.req
     if 'authorization' not in ctx.req.headers:
         ctx.state.operator = None
         await next(ctx)
     else:
-        authorization = req.headers['authorization']
+        authorization = ctx.req.headers['authorization']
         token = authorization[7:]
         try:
             decoded = decode_jwt_token(token)

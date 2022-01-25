@@ -10,13 +10,7 @@ default_operator_conf = {
     "secretKey": "!@#$%^&*())(*&^%$#@"
 }
 
-def check_jwt_installed() -> None:
-    packages = {'jwt': ('pyjwt', '>=2.1.0,<3.0.0')}
-    check_and_install_packages(packages)
-
-
 def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:
-    check_jwt_installed()
     from jwt import decode
     operator_conf = uconf().get('operator') or default_operator_conf
     secret_key = operator_conf.get('secret_key')
@@ -30,7 +24,6 @@ def decode_jwt_token(token: str, gname: str = 'default') -> ORMObject | None:
 
 
 def encode_jwt_token(operator: ORMObject, expired_in: timedelta) -> str:
-    check_jwt_installed()
     from jwt import encode
     operator_conf = uconf().get('operator') or default_operator_conf
     secret_key = operator_conf.get('secret_key')
