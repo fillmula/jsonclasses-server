@@ -137,7 +137,7 @@ class API:
     def record_r(self: API, cls: type[APIObject], url: str) -> None:
         @get(url)
         async def read_by_id(ctx: Ctx):
-            id = ctx.req.args.get('id')
+            id = ctx.req.args['id']
             result = cls.id(id, ctx.req.query).exec().opby(ctx.state.operator)
             ctx.res.json({'data': result.tojson()})
 
@@ -164,26 +164,29 @@ class API:
                     result: list[dict[str, Any]] = []
                     for i in create:
                         i_result = cls(**(i or {})).opby(ctx.state.operator).save()
+                        op = getattr(i_result, '_operator')
                         if url_qs != '':
-                            i_result = cls.id(i_result._id, url_qs).exec().opby(ctx.state.operator)
+                            i_result = cls.id(i_result._id, url_qs).exec().opby(op)
                         result.append(i_result.tojson())
                     ctx.res.json({"data": result})
                 elif isinstance(create, dict):
                     data = create.get('_data')
                     result = cls(**(data or {})).opby(ctx.state.operator).save()
+                    op = getattr(result, '_operator')
                     if url_qs != '':
-                        result = cls.id(result._id, url_qs).exec().opby(ctx.state.operator)
+                        result = cls.id(result._id, url_qs).exec().opby(op)
                     ctx.res.json({"data": result.tojson()})
             else:
                 result = cls(**(resource or {})).opby(ctx.state.operator).save()
+                op = getattr(result, '_operator')
                 if url_qs != '':
-                    result = cls.id(result._id, url_qs).exec().opby(ctx.state.operator)
+                    result = cls.id(result._id, url_qs).exec().opby(op)
                 ctx.res.json({"data": result.tojson()})
 
     def record_u(self: API, cls: type[APIObject], url: str) -> None:
         @patch(url)
         async def update_one(ctx: Ctx):
-            id = ctx.req.args.get('id')
+            id = ctx.req.args['id']
             body = ctx.req.json
             result = cls.id(id, ctx.req.query).exec().opby(ctx.state.operator).set(**(body or {})).save()
             ctx.res.json({'data': result.tojson()})
@@ -205,7 +208,7 @@ class API:
     def record_d(self: API, cls: type[APIObject], url: str) -> None:
         @delete(url)
         async def delete_by_id(ctx: Ctx) -> None:
-            id = ctx.req.args.get('id')
+            id = ctx.req.args['id']
             cls.id(id).exec().opby(ctx.state.operator).delete()
             ctx.res.empty()
 
