@@ -67,7 +67,7 @@ class API:
         auth_conf.info._srname = srname
         @post(url)
         async def create_session(ctx: Ctx):
-            body = cast(dict[str, Any], ctx.req.json)
+            body = cast(dict[str, Any], await ctx.req.dict())
             ai_set = set(body.keys()).intersection(ai_valid_names)
             len_ai_set = len(ai_set)
             if len_ai_set < 1:
@@ -97,8 +97,8 @@ class API:
             token = encode_jwt_token(obj, auth_conf.expires_in)
             srname = auth_conf.info.srname
             json_obj = obj.opby(obj).tojson()
-            if ctx.req.query != '':
-                json_obj = cls.id(obj._id, ctx.req.query).exec().opby(obj).tojson()
+            if ctx.req.qs != '':
+                json_obj = cls.id(obj._id, ctx.req.qs).exec().opby(obj).tojson()
             result = {'token': token, srname: json_obj}
             ctx.res.json({"data": result})
 
@@ -125,7 +125,7 @@ class API:
     def record_l(self: API, cls: type[APIObject], url: str) -> None:
         @get(url)
         async def list_all(ctx: Ctx):
-            result = cls.find(ctx.req.query).exec()
+            result = cls.find(ctx.req.qs).exec()
             filtered = []
             for item in result:
                 try:
@@ -138,19 +138,19 @@ class API:
         @get(url)
         async def read_by_id(ctx: Ctx):
             id = ctx.req.args['id']
-            result = cls.id(id, ctx.req.query).exec().opby(ctx.state.operator)
+            result = cls.id(id, ctx.req.qs).exec().opby(ctx.state.operator)
             ctx.res.json({'data': result.tojson()})
 
     def record_c(self: API, cls: type[APIObject], url: str) -> None:
         @post(url)
         async def create(ctx: Ctx):
-            resource = ctx.req.json
-            url_qs = ctx.req.query
+            resource = await ctx.req.dict()
+            url_qs = ctx.req.qs
             upsert: dict[str, Any] = resource.get('_upsert')
             create = resource.get('_create')
             if upsert and create is None:
-                query = stringify(upsert.get('_query'))
-                qs = query if url_qs == '' else f'{query}&{url_qs}'
+                qs = stringify(upsert.get('_query'))
+                qs = qs if url_qs == '' else f'{qs}&{url_qs}'
                 input_data = upsert.get('_data')
                 if input_data is not None:
                     result = cls.one(qs).optional.exec()
@@ -187,18 +187,18 @@ class API:
         @patch(url)
         async def update_one(ctx: Ctx):
             id = ctx.req.args['id']
-            body = ctx.req.json
-            result = cls.id(id, ctx.req.query).exec().opby(ctx.state.operator).set(**(body or {})).save()
+            body = await ctx.req.dict()
+            result = cls.id(id, ctx.req.qs).exec().opby(ctx.state.operator).set(**(body or {})).save()
             ctx.res.json({'data': result.tojson()})
 
 
     def record_um(self: API, cls: type[APIObject], url: str) -> None:
         @patch(url)
         async def update_many(ctx: Ctx):
-            resource = ctx.req.json
+            resource = await ctx.req.dict()
             update = resource.get('_update')
             uq = stringify(update['_query'])
-            qs = uq if ctx.req.query == '' else f'{uq}&{ctx.req.query}'
+            qs = uq if ctx.req.qs == '' else f'{uq}&{ctx.req.qs}'
             result = cls.find(qs).exec()
             updated = []
             for item in result:
@@ -215,7 +215,7 @@ class API:
     def record_dm(self: API, cls: type[APIObject], url: str) -> None:
         @delete(url)
         async def delete_by_id(ctx: Ctx) -> None:
-            result = cls.find(ctx.req.query).exec()
+            result = cls.find(ctx.req.qs).exec()
             for item in result:
                 item.opby(ctx.state.operator).delete()
             ctx.res.empty()
@@ -223,7 +223,7 @@ class API:
     def record_e(self: API, cls: type[APIObject], url: str) -> None:
         @post(url)
         async def e(ctx: Ctx) -> Any:
-            body = ctx.req.json
+            body = await ctx.req.dict()
             ufields = cls.cdef._unique_fields
             unames = [f.name for f in ufields]
             ujsonnames = [f.json_name for f in ufields]
