@@ -230,7 +230,7 @@ class API:
             uvalidnames = set(unames + ujsonnames)
             matcher: dict[str, Any] = {}
             updater: dict[str, Any] = {}
-            for k, v in await body.items():
+            for k, v in body.items():
                 if k in uvalidnames:
                     if body[k] is not None:
                         matcher[k] = v
