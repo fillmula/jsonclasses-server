@@ -68,10 +68,12 @@ async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
             decoded = decode_jwt_token(token)
             ctx.state.operator = decoded
         except DecodeError:
+            ctx.state.operator = None
             content = _error_content('Unauthorized', 'authorization token is invalid')
             ctx.res.code = 401
             ctx.res.json(content)
         except ObjectNotFoundException:
+            ctx.state.operator = None
             content = _error_content('Unauthorized', 'user is not authorized')
             ctx.res.code = 401
             ctx.res.json(content)
