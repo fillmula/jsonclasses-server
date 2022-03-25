@@ -1,14 +1,16 @@
 from __future__ import annotations
 from traceback import print_exception
-from thunderlight import Ctx, Next, App, gimme, use
+from os import getcwd
+from os.path import join
+from thunderlight import Ctx, Next, gimme, use, get, App
 from jsonclasses.uconf import uconf
 from jsonclasses.excs import (ObjectNotFoundException,
                               ValidationException,
                               UniqueConstraintException,
                               UnauthorizedActionException)
+from jwt import DecodeError
 from .excs import AuthenticationException
 from .jwt_token import decode_jwt_token
-from jwt import DecodeError
 
 
 def _error_content(type: str, msg: str) -> dict[str, str]:
@@ -78,6 +80,16 @@ async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
             ctx.res.code = 401
             ctx.res.json(content)
         await next(ctx)
+
+
+uploaders_conf = uconf().get('uploders')
+if uploaders_conf is not None:
+    for k, v in uploaders_conf._conf.items():
+        if v['client'] == 'localfs':
+            @get(f'/{v["config"]["dir"]}/*')
+            async def static_file_serving(ctx: Ctx):
+                ctx.res.code = 200
+                ctx.res.file(join(getcwd(), v["config"]["dir"], ctx.req.args['*']))
 
 
 def server() -> App:
