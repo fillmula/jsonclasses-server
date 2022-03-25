@@ -82,7 +82,7 @@ async def set_operator_middleware(ctx: Ctx, next: Next) -> None:
         await next(ctx)
 
 
-uploaders_conf = uconf().get('uploders')
+uploaders_conf = uconf().get('uploaders')
 if uploaders_conf is not None:
     for k, v in uploaders_conf._conf.items():
         if v['client'] == 'localfs':
