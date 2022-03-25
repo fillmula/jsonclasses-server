@@ -89,7 +89,7 @@ if uploaders_conf is not None:
             @get(f'/public/{v["config"]["dir"]}/*')
             async def static_file_serving(ctx: Ctx):
                 ctx.res.code = 200
-                ctx.res.file(join(getcwd(), v["config"]["dir"], ctx.req.args['*']))
+                ctx.res.file(join(getcwd(), 'public', v["config"]["dir"], ctx.req.args['*']))
 
 
 def server() -> App:
