@@ -86,7 +86,7 @@ uploaders_conf = uconf().get('uploaders')
 if uploaders_conf is not None:
     for k, v in uploaders_conf._conf.items():
         if v['client'] == 'localfs':
-            @get(f'/{v["config"]["dir"]}/*')
+            @get(f'/public/{v["config"]["dir"]}/*')
             async def static_file_serving(ctx: Ctx):
                 ctx.res.code = 200
                 ctx.res.file(join(getcwd(), v["config"]["dir"], ctx.req.args['*']))
