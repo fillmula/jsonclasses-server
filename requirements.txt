@@ -1,5 +1,5 @@
-jsonclasses>=3.3.0,<4.0.0
-jsonclasses-pymongo>=3.3.0,<4.0.0
+jsonclasses>=3.4.0,<4.0.0
+jsonclasses-pymongo>=3.4.0,<4.0.0
 qsparser>=1.0.1,<2.0.0
 pyjwt>=2.3.0,<3.0.0
 requests>=2.0.0,<3.0.0
